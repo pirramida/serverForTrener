@@ -17,10 +17,10 @@ export class ClientsService {
     });
   }
 
-  addClient(name: string, email: string, phone: string): Promise<void> {
+  addClient(form: any): Promise<void> {
     return new Promise((resolve, reject) => {
       const query = `INSERT INTO clients (name, email, phone) VALUES (?, ?, ?)`;
-      this.databaseService.getDB().run(query, [name, email, phone], (err) => {
+      this.databaseService.getDB().run(query,  (err) => {
         if (err) reject(err);
         else resolve();
       });

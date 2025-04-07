@@ -11,7 +11,7 @@ export class ClientsController {
   }
 
   @Post()
-  async addClient(@Body() body: { name: string; email: string; phone: string }) {
+  async addClient(@Body() body: { form: any}) {
     await this.clientsService.addClient(body.name, body.email, body.phone);
     return { message: 'Клиент добавлен' };
   }
