@@ -32,11 +32,23 @@ export class DatabaseService implements OnModuleInit {
       CREATE TABLE IF NOT EXISTS clients (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
-        email TEXT UNIQUE NOT NULL,
-        phone TEXT,
+        phone TEXT UNIQUE NOT NULL,
+        age INTEGER,
+        gender TEXT,
+        photo BLOB,
+        goal TEXT,
+        activityLevel TEXT,
+        injuries TEXT,
+        trainingHistory TEXT,
+        weight INTEGER,
+        height INTEGER,
+        chest INTEGER,
+        waist INTEGER,
+        hips INTEGER,
+        bodyFat REAL,
         createdAt TEXT DEFAULT CURRENT_TIMESTAMP
-      );
-    `;
+    );
+  `;
 
     this.db.run(createClientsTable, (err) => {
       if (err) {

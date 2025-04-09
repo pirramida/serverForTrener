@@ -12,7 +12,7 @@ export class ClientsController {
 
   @Post()
   async addClient(@Body() body: { form: any}) {
-    await this.clientsService.addClient(body.name, body.email, body.phone);
+    await this.clientsService.addClient(body.form);
     return { message: 'Клиент добавлен' };
   }
 }
