@@ -24,7 +24,7 @@ export class ClientsController {
 
   @Patch()
   async changeClient(@Body() body: { phoneNumber: any, form: any }) {
-    await this.clientsService.changeClient(body.phoneNumber, body.form);
-    return { message: 'Данные пользователя обновлены!' }
+    const newClientData = await this.clientsService.changeClient(body.phoneNumber, body.form);
+    return { data: newClientData, message: 'Данные пользователя обновлены!' }
   }
 }

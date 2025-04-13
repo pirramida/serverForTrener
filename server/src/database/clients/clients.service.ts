@@ -34,7 +34,9 @@ export class ClientsService {
     try {
       // Получаем данные клиента по номеру телефона
       const changeClient = await this.databaseService.query('SELECT * FROM clients WHERE phone = ?', [phoneNumber]);
-      
+      console.log('chanchangeClientgeClient', changeClient);
+      console.log('formformformformformform', form);
+
       // Проверяем, если клиент не найден
       if (changeClient.length === 0) {
         console.log(`Ошибка при изменении клиента с номером ${phoneNumber}: клиент не найден`);
@@ -57,8 +59,9 @@ export class ClientsService {
           chest = ?, 
           waist = ?, 
           hips = ?, 
-          bodyFat = ?
-        WHERE phone = ?
+          bodyFat = ?,
+          phone = ?
+        WHERE id = ?
       `;
   
       const values = [
@@ -69,19 +72,24 @@ export class ClientsService {
         form.goal,
         form.activityLevel,
         form.injuries,
-        JSON.stringify(form.trainingHistory),
+        form.trainingHistory,
         form.weight,
         form.height,
         form.chest,
         form.waist,
         form.hips,
         form.bodyFat,
-        phoneNumber
+        form.phone,
+        (changeClient[0] as any).id
       ];
+
+      console.log('valuesvaluesvaluesvalues', values);
+
   
       // Выполняем обновление
       await this.databaseService.run(query, values);
-  
+      const newDataClient = await this.databaseService.query('SELECT * FROM clients WHERE id = ?', [(changeClient[0] as any).id]);
+      return (newDataClient as any);
     } catch (error) {
       console.log(`Ошибка при изменении клиента с номером ${phoneNumber}:`, error);
       throw new HttpException(`Ошибка при изменении клиента с номером ${phoneNumber}:`, HttpStatus.INTERNAL_SERVER_ERROR);

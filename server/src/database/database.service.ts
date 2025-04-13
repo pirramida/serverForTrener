@@ -128,6 +128,27 @@ export class DatabaseService implements OnModuleInit {
         role TEXT NOT NULL, -- например, 'trainer' или 'admin'
         email TEXT
       );
+
+      CREATE TABLE payment_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        phone TEXT, -- привязка к клиенту
+        action TEXT NOT NULL, -- тип операции (оплата, возврат и т.п.)
+        amount REAL,
+        description TEXT, -- например, "Оплата пакета 8 тренировок"
+        date TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        method TEXT, -- наличные, карта и т.п.
+        status TEXT -- успешный, отменен и т.д.
+      );
+
+      CREATE TABLE activity_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        phone TEXT, -- привязка к клиенту
+        action TEXT NOT NULL, -- тип действия (created, updated, deleted и т.п.)
+        description TEXT, -- дополнительная информация (например, "Изменен возраст с 22 на 23")
+        date TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        performedBy TEXT -- кто совершил действие (если нужно)
+      );
+
     `;
 
     this.db.run(createClientsTable, (err) => {
