@@ -10,10 +10,17 @@ export class PaymentController {
         return await this.paymentService.getAllPaymentHistory();
     }
 
-//   @Get()
-//   async getClients() {
-//     return await this.paymentService.getAllClients();
-//   }
+    @Post()
+    async postNewPaymentHistory(@Body() body: {fromData: any}) {
+        try {
+            const response = await this.paymentService.postNewPaymentHistory(body.fromData);
+            return {message: 'Успешно!', data: response}
+        } catch (error) {
+            return {message: error};
+        }
+        
+        
+    }
 
 //   @Post()
 //   async addClient(@Body() body: { form: any}) {

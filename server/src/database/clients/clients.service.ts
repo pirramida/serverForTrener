@@ -34,12 +34,9 @@ export class ClientsService {
     try {
       // Получаем данные клиента по номеру телефона
       const changeClient = await this.databaseService.query('SELECT * FROM clients WHERE phone = ?', [phoneNumber]);
-      console.log('chanchangeClientgeClient', changeClient);
-      console.log('formformformformformform', form);
 
       // Проверяем, если клиент не найден
       if (changeClient.length === 0) {
-        console.log(`Ошибка при изменении клиента с номером ${phoneNumber}: клиент не найден`);
         throw new HttpException(`Ошибка при изменении клиента с номером ${phoneNumber}: клиент не найден`, HttpStatus.BAD_REQUEST);
       }
   
