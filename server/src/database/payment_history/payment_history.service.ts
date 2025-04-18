@@ -10,7 +10,7 @@ export class PaymentService {
 
       async getAllPaymentHistory(): Promise<any[]> {
         try {
-          return await this.databaseService.query('SELECT * FROM payment_history ORDER BY date DESC');
+          return await this.databaseService.query('SELECT * FROM payment_history');
         } catch (err) {
           console.error('Ошибка при получении истории платежей:', err.message);
           return [];
@@ -36,7 +36,7 @@ export class PaymentService {
       
           const query = `
             INSERT INTO payment_history (
-              id, date, client, amount, type, status, dateTo, customPaymentType,
+              unique_id, date, client, amount, type, status, dateTo, customPaymentType,
               isExpiryDateManuallySet, notes, phone, method
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `;
