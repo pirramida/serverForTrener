@@ -14,8 +14,6 @@ export class PaymentController {
     async postNewPaymentHistory(@Body() body: {fromData: any}) {
         try {
             const response = await this.paymentService.postNewPaymentHistory(body.fromData);
-            console.log(response);
-
             return {message: 'Успешно!', data: response}
         } catch (error) {
             return {message: error};

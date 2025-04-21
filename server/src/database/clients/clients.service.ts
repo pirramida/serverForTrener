@@ -80,8 +80,6 @@ export class ClientsService {
         (changeClient[0] as any).id
       ];
 
-      console.log('valuesvaluesvaluesvalues', values);
-
   
       // Выполняем обновление
       await this.databaseService.run(query, values);

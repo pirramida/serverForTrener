@@ -55,7 +55,18 @@ export class PaymentService {
             phone,
             method,
           ]);
-      
+
+          let sessionCount;
+          
+          if (type === 'Другое') { sessionCount = extractSessionCount(customPaymentType);}
+          else { sessionCount = extractSessionCount(type); }
+
+          const result = await this.databaseService.run(
+            'UPDATE clients SET sessions = COALESCE(sessions, 0) + ? WHERE name = ?',
+            [sessionCount, client]
+          );
+          
+
           return { success: true, message: 'Платеж успешно добавлен!' };
         } catch (error) {
           console.error('Произошла неудача при внесении транзакции в приложение ', error);
@@ -67,4 +78,28 @@ export class PaymentService {
       }
       
       
+
+
+      
+}
+
+function extractSessionCount(input: any): number {
+  if (!input) return 0;
+
+  if (typeof input === 'number') {
+    return input;
+  }
+
+  if (typeof input === 'string') {
+    const lower = input.toLowerCase();
+
+    if (lower.includes('разовая')) return 1;
+
+    const match = lower.match(/\d+/);
+    if (match) {
+      return parseInt(match[0], 10);
+    }
+  }
+
+  return 0;
 }
