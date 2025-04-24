@@ -18,8 +18,21 @@ export class PaymentController {
         } catch (error) {
             return {message: error};
         }
-        
-        
+    }
+
+    @Patch()
+    async changeSessionsClient(@Body() body: {client: any}) {
+        try {
+            const response = await this.paymentService.changeSessionsClient(body.client);
+            if (response) {
+                return {status: true, data: response}
+            } 
+            return {status: false}
+
+        } catch (error) {
+            return {message: error}
+
+        }
     }
 
 //   @Post()
