@@ -20,6 +20,11 @@ export class PaymentController {
         }
     }
 
+    @Get('/quantity')
+    async getQuantity(@Body() body: {client: any}) {
+        return await this.paymentService.getQuantity(body.client);
+    }
+
     @Patch()
     async changeSessionsClient(@Body() body: {client: any}) {
         try {

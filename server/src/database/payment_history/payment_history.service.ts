@@ -114,8 +114,8 @@ export class PaymentService {
   
       // 7. Возвращаем обновленную информацию
       const response = await this.databaseService.query(
-        'SELECT sessions FROM clients WHERE name = ? AND phone = ?',
-        [client.name, client.phone]
+        'SELECT quantity, quantityLeft FROM payment_history WHERE unique_id = ?',
+        [firstPackageId]
       );
   
       return response;
@@ -125,6 +125,34 @@ export class PaymentService {
     }
   }
   
+
+  async getQuantity(client: any): Promise<any[]> {
+    try {
+
+      const currentSessionQueueQuery = `
+        SELECT sessionQueue FROM clients WHERE name = ? AND phone = ?
+      `;
+      const result: { sessionQueue: string | null }[] = await this.databaseService.query(currentSessionQueueQuery, [client.name, client.phone]);
+  
+      // Проверяем, существует ли результат и содержит ли он sessionQueue
+      const currentQueue = result.length > 0 && result[0].sessionQueue
+        ? JSON.parse(result[0].sessionQueue) // Если sessionQueue существует, парсим его
+        : []; // Иначе возвращаем пустой массив
+  
+      // Получаем ID первого пакета из очереди
+      const firstPackageId = currentQueue.length > 0 ? currentQueue[0].id : null;
+      if (!firstPackageId) {
+        throw new Error('Нет пакетов в очереди для списания');
+      }
+
+      
+
+      return await this.databaseService.query('SELECT quantity, quantityLeft FROM payment_history WHERE unique_id = ?', [firstPackageId]);
+    } catch (err) {
+      console.error('Ошибка при получении истории платежей:', err.message);
+      return [];
+    }
+  }
   
   
 
