@@ -20,9 +20,9 @@ export class PaymentController {
         }
     }
 
-    @Get('/quantity')
-    async getQuantity(@Body() body: {client: any}) {
-        return await this.paymentService.getQuantity(body.client);
+    @Patch('/quantity')
+    async getQuantity(@Body() client: any) {
+        return await this.paymentService.getQuantity(client);
     }
 
     @Patch()
