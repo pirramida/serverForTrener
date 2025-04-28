@@ -145,8 +145,6 @@ export class PaymentService {
       if (!firstPackageId) {
         throw new Error('Нет пакетов в очереди для списания');
       }
-   
-
       return await this.databaseService.query('SELECT quantity, quantityLeft, dateTo FROM payment_history WHERE unique_id = ?', [firstPackageId]);
     } catch (err) {
       console.error('Ошибка при получении истории платежей:', err.message);
