@@ -19,6 +19,79 @@ export class PaymentService {
 
   async changeSessionsClient(client: { name: string; phone: string }): Promise<any> {
     try {
+      // Для месячного обновления статистики!
+      // Получаем текущую дату
+      const now = new Date();
+      const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+      // Получаем дату последнего сброса
+      const resetResult: { lastReset: string | null }[] = await this.databaseService.query(
+        `SELECT lastReset FROM users WHERE name = ?`,
+        ['Юлия']
+      );
+
+      const lastReset = resetResult.length > 0 ? resetResult[0].lastReset : null;
+      const lastResetMonth = lastReset?.slice(0, 7); // YYYY-MM
+
+      if (lastResetMonth !== currentMonth) {
+        // Получаем текущие значения
+        const userData: {
+          cashInMonth: number;
+          sessionsInMonth: number;
+          newClientsInMonth: number;
+        }[] = await this.databaseService.query(
+          `SELECT cashInMonth, sessionsInMonth, newClientsInMonth FROM users WHERE name = ?`,
+          ['Юлия']
+        );
+
+        const { cashInMonth, sessionsInMonth, newClientsInMonth } = userData[0];
+
+        // Период — это месяц, за который собираем статистику (предыдущий)
+        const previousMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const period = `${previousMonthDate.getFullYear()}-${String(previousMonthDate.getMonth() + 1).padStart(2, '0')}`;
+
+        // Поменять на id user настоящий. Пока что один пользователь 1 id 
+        const user_id = 1
+        // Сохраняем статистику
+        await this.databaseService.query(
+          `
+          INSERT INTO statistic (
+            cashInMonth,
+            sessionsInMonth,
+            clientsInMonth,
+            period,
+            createdAt,
+            user_id
+          ) VALUES (?, ?, ?, ?, ?, ?)
+          `,
+          [
+            cashInMonth,
+            sessionsInMonth,
+            newClientsInMonth,
+            period,
+            now.toISOString(),
+            user_id
+          ]
+        );
+
+        // Обнуляем поля
+        await this.databaseService.query(
+          `
+          UPDATE users
+          SET 
+            cashInMonth = 0,
+            sessionsInMonth = 0,
+            newClientsInMonth = 0,
+            lastReset = ?
+          WHERE name = ?
+          `,
+          [now.toISOString(), 'Юлия']
+        );
+      }
+
+
+      //-----------------------------------------------------------------
+
       // 1. Получаем ID пакета из sessionQueue клиента
       const currentSessionQueueQuery = `
         SELECT sessionQueue FROM clients WHERE name = ? AND phone = ?
@@ -38,9 +111,9 @@ export class PaymentService {
   
       // 2. Получаем текущий пакет из payment_history
       const packageQuery = `
-        SELECT quantityLeft, status FROM payment_history WHERE unique_id = ?
+        SELECT quantityLeft, status, amount, quantity FROM payment_history WHERE unique_id = ?
       `;
-      const packageResult: { quantityLeft: number; status: string }[] = await this.databaseService.query(packageQuery, [firstPackageId]);
+      const packageResult: { quantityLeft: number; status: string; amount: number; quantity: number; }[] = await this.databaseService.query(packageQuery, [firstPackageId]);
   
       // Проверяем, что результат не пустой
       if (packageResult.length === 0) {
@@ -48,7 +121,7 @@ export class PaymentService {
       }
   
       // Деструктурируем quantityLeft и status из первого элемента результата
-      const { quantityLeft, status } = packageResult[0];
+      const { quantityLeft, status, amount, quantity } = packageResult[0];
   
       // 3. Уменьшаем количество тренировок (quantityLeft)
       let updatedQuantityLeft = quantityLeft - 1;
@@ -111,13 +184,29 @@ export class PaymentService {
         `,
         [client.name, Number(client.phone), 'Списание тренировки']
       );
-  
+    
       // 7. Возвращаем обновленную информацию
       const response = await this.databaseService.query(
         'SELECT quantity, quantityLeft FROM payment_history WHERE unique_id = ?',
         [firstPackageId]
       );
   
+      // 8. Расчёт дохода за проведённую тренировку
+
+      // Получаем стоимость одной тренировки
+      const pricePerSession = amount / quantity;
+
+      // Обновляем доход тренера за месяц
+      await this.databaseService.query(
+        `UPDATE users SET 
+          cashInMonth = COALESCE(cashInMonth, 0) + ?, 
+          sessionsInMonth = COALESCE(sessionsInMonth, 0) + 1,
+          totalCash = COALESCE(totalCash, 0) + ?, 
+          totalSessions = COALESCE(totalSessions, 0) + 1
+        WHERE name = ?`,
+        [pricePerSession, pricePerSession, 'Юлия']
+      );
+
       return response;
     } catch (error) {
       console.error('Произошла ошибка в процессе выполнения:', error);
