@@ -24,7 +24,7 @@ export class UsersController {
       throw new HttpException('Не удалось получить события', HttpStatus.BAD_REQUEST);
     }
 
-    return events;
+    return {message: true, events: events};
   }
 
   @Post('refresh')
@@ -55,6 +55,14 @@ export class UsersController {
     }
   
     return data;
+  }
+
+  @Patch('newSessions')
+  async addSessions(@Body() body: any) {
+    const { newWorkout } = body;
+    const response = await this.userService.addSessions(newWorkout);
+    if (!response) { throw new HttpException('Не удалось записать прошедшую тренировку', HttpStatus.BAD_REQUEST) }
+    return response;
   }
   
 

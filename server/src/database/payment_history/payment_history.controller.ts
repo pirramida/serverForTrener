@@ -26,9 +26,9 @@ export class PaymentController {
     }
 
     @Patch()
-    async changeSessionsClient(@Body() body: {client: any}) {
+    async changeSessionsClient(@Body() body: {client: any, payload: any}) {
         try {
-            const response = await this.paymentService.changeSessionsClient(body.client);
+            const response = await this.paymentService.changeSessionsClient(body.client, body.payload);
             if (response) {
                 return {status: true, data: response}
             } 

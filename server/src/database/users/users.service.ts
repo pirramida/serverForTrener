@@ -50,12 +50,30 @@ export class UsersService {
           console.error('Ошибка при работе с Google аккаунтом:', err);
           return { message: false };
         }
-      }
-    
+    }
 
-      async getGoogleCalendarEvents(): Promise<any> {
+    async addSessions(newWorkout): Promise<boolean> {
         try {
-            console.log('Получаем данные пользователя из базы...');
+            const events = await this.databaseService.query(
+                `SELECT events_todayChange FROM users WHERE name = ?`,
+                ['Юлия']
+            ) as any;
+
+            
+            let oldEvents = JSON.parse(events[0].events_todayChange);
+            oldEvents.push(newWorkout);
+            
+            await this.databaseService.query('UPDATE users SET events_todayChange = ? WHERE name = ?', [oldEvents = JSON.stringify(oldEvents), 'Юлия'])
+            return true
+        } catch (err) {
+
+            return false
+
+        }
+    }
+
+    async getGoogleCalendarEvents(): Promise<any> {
+        try {
             
             // Получаем данные пользователя из базы
             const [user] = await this.databaseService.query(
@@ -67,9 +85,7 @@ export class UsersService {
                 console.error('Ошибка: Нет сохранённого Google аккаунта');
                 throw new Error('Нет сохранённого Google аккаунта');
             }
-    
-            console.log('Данные пользователя загружены:', user);
-    
+        
             // Распаковываем данные пользователя
             const { email, access_token, refresh_token, token_expires } = JSON.parse(user.googleCalendar);
     
@@ -85,7 +101,9 @@ export class UsersService {
                 refresh_token,
                 expiry_date: token_expires,
             });
-    
+            
+            await oAuth2Client.getAccessToken();
+
             // Обновляем токен, если он истекает
             oAuth2Client.on('tokens', async (tokens) => {
                 if (tokens.access_token) {
@@ -101,7 +119,6 @@ export class UsersService {
                         `UPDATE users SET googleCalendar = ? WHERE name = ?`,
                         [JSON.stringify(updated), 'Юлия']
                     );
-                    console.log('Токены обновлены в базе данных.');
                 }
             });
     
@@ -113,7 +130,6 @@ export class UsersService {
             const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
             const endOfTomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 23, 59, 59);
     
-            console.log('Запрашиваем события для периода: сегодня и завтра...');
             const res = await calendar.events.list({
                 calendarId: 'primary',
                 timeMin: startOfToday.toISOString(),
@@ -126,10 +142,11 @@ export class UsersService {
             // Делаем фильтрацию на два массива: для сегодня и завтра
             let events = res.data.items?.map(event => {
                 let eventDate = event.start?.dateTime ? new Date(event.start.dateTime) : new Date(event.start?.date);
-                eventDate.setHours(eventDate.getHours() + 3); // Добавляем 3 часа к времени события
+                eventDate.setHours(eventDate.getHours()); // Добавляем 3 часа к времени события
                 return {
                     summary: event.summary,
                     start: eventDate.toISOString(),
+                    marked: false,
                 };
             }) || [];
     
@@ -140,94 +157,142 @@ export class UsersService {
             const todayEvents = events.filter(event => new Date(event.start).toDateString() === today.toDateString());
             const tomorrowEvents = events.filter(event => new Date(event.start).toDateString() === tomorrow.toDateString());
     
-            console.log('События на сегодня:', todayEvents);
-            console.log('События на завтра:', tomorrowEvents);
-    
-            // Если колонки пустые, записываем новые события
-            const response = await this.databaseService.query('SELECT * FROM users WHERE name = ?', ['Юлия']) as any[];
-
-            if (!response[0].events_today || !response[0].events_tomorrow || !response[0].events_todayChange || !response[0].events_tomorrowChange) {
-                console.log('Колонки в базе данных пустые, записываем новые события...');
+            if (!user.events_todayChange || !user.events_tomorrowChange) {
                 await this.databaseService.query(
                     `UPDATE users SET events_today = ?, events_tomorrow = ?, events_todayChange = ?, events_tomorrowChange = ? WHERE name = ?`,
                     [JSON.stringify(todayEvents), JSON.stringify(tomorrowEvents), JSON.stringify(todayEvents), JSON.stringify(tomorrowEvents), 'Юлия']
                 );
-                console.log('Записали новые события в базу данных.');
-            } else {
-                console.log('Загружаем текущие события из базы данных...');
-                // Загружаем текущие события из базы данных
-                const storedTodayEvents = JSON.parse(response[0].events_today || '[]');
-                const storedTomorrowEvents = JSON.parse(response[0].events_tomorrow || '[]');
-                const storedTodayChange = JSON.parse(response[0].events_todayChange || '[]');
-                const storedTomorrowChange = JSON.parse(response[0].events_tomorrowChange || '[]');
+            } else {    
+                const events_todayChange = JSON.parse(user.events_todayChange);
+                const events_tomorrowChange = JSON.parse(user.events_tomorrowChange);
+
+                // Проверяем есть ли новые события на сегодня
+                const newTodayEventsAdd = todayEvents.filter(event => 
+                    !events_todayChange.some(stored => 
+                        stored.summary === event.summary && stored.start === event.start
+                    )
+                )
+                
+                // Проверяем есть ли лишние события на сегодня
+                const newTodayEventsDelete = events_todayChange.filter(event => 
+                    !event.marked &&
+                    !event?.status &&
+                    !todayEvents.some(stored => 
+                        stored.summary === event.summary && stored.start === event.start
+                    )
+                )
+
+                // Проверяем есть ли новые события на завтра
+                const newTomorrowEventsAdd = tomorrowEvents.filter(event => 
+                    !events_tomorrowChange.some(stored => 
+                        stored.summary === event.summary && stored.start === event.start
+                    )
+                )
+                
+                // Проверяем есть ли лишние события на завтра
+                const newTomorrowEventsDelete = events_tomorrowChange.filter(event => 
+                    !event.marked &&
+                    !event?.status &&
+                    !tomorrowEvents.some(stored => 
+                        stored.summary === event.summary && stored.start === event.start
+                    )
+                )
+                
+                // Объединяем старые и новые события (добавляем новые)
+                let updatedTodayEvents = [
+                    ...events_todayChange,
+                    ...newTodayEventsAdd
+                ].filter(event =>
+                    !newTodayEventsDelete.some(deleted =>
+                        deleted.summary === event.summary && deleted.start === event.start
+                    )
+                );
+
+                let updatedTomorrowEvents = [
+                    ...events_tomorrowChange,
+                    ...newTomorrowEventsAdd
+                ].filter(event =>
+                    !newTomorrowEventsDelete.some(deleted =>
+                        deleted.summary === event.summary && deleted.start === event.start
+                    )
+                );
+
+                updatedTodayEvents = updatedTodayEvents.filter(event => new Date(event.start).toDateString() === today.toDateString());
+                updatedTomorrowEvents = updatedTomorrowEvents.filter(event => new Date(event.start).toDateString() === tomorrow.toDateString());
     
-                // 1. Находим новые события, которые пришли из Google, но отсутствуют в базе
-                const newTodayEvents = todayEvents.filter(event => !storedTodayEvents.some(stored => stored.summary === event.summary));
-                const newTomorrowEvents = tomorrowEvents.filter(event => !storedTomorrowEvents.some(stored => stored.summary === event.summary));
-    
-                console.log('Новые события для добавления:');
-                console.log('Сегодня:', newTodayEvents);
-                console.log('Завтра:', newTomorrowEvents);
-    
-                // 2. Находим события, которые есть в базе, но их нет в новых данных (удаляем их)
-                const removedTodayEvents = storedTodayEvents.filter(event => !todayEvents.some(e => e.summary === event.summary));
-                const removedTomorrowEvents = storedTomorrowEvents.filter(event => !tomorrowEvents.some(e => e.summary === event.summary));
-    
-                console.log('События, которые нужно удалить:');
-                console.log('Сегодня:', removedTodayEvents);
-                console.log('Завтра:', removedTomorrowEvents);
-    
-                // 3. Добавляем недостающие события
-                if (newTodayEvents.length > 0) {
-                    console.log('Добавляем новые события на сегодня...');
+                // Обновляем в базе только если что-то изменилось
+                const isTodayChanged =
+                    newTodayEventsAdd.length > 0 || newTodayEventsDelete.length > 0;
+                const isTomorrowChanged =
+                    newTomorrowEventsAdd.length > 0 || newTomorrowEventsDelete.length > 0;
+
+                
+                if (isTodayChanged || isTomorrowChanged) {
                     await this.databaseService.query(
-                        `UPDATE users SET events_today = ?, events_todayChange = ? WHERE name = ?`,
-                        [JSON.stringify([...storedTodayEvents, ...newTodayEvents]), JSON.stringify([...storedTodayChange, ...newTodayEvents]), 'Юлия']
+                        `UPDATE users SET events_todayChange = ?, events_tomorrowChange = ? WHERE name = ?`,
+                        [JSON.stringify(updatedTodayEvents), JSON.stringify(updatedTomorrowEvents), 'Юлия']
                     );
-                    console.log('Новые события на сегодня добавлены в базу.');
                 }
-    
-                if (newTomorrowEvents.length > 0) {
-                    console.log('Добавляем новые события на завтра...');
-                    await this.databaseService.query(
-                        `UPDATE users SET events_tomorrow = ?, events_tomorrowChange = ? WHERE name = ?`,
-                        [JSON.stringify([...storedTomorrowEvents, ...newTomorrowEvents]), JSON.stringify([...storedTomorrowChange, ...newTomorrowEvents]), 'Юлия']
-                    );
-                    console.log('Новые события на завтра добавлены в базу.');
-                }
-    
-                // 4. Удаляем лишние события
-                if (removedTodayEvents.length > 0) {
-                    console.log('Удаляем лишние события на сегодня...');
-                    const updatedTodayChange = storedTodayChange.filter(event => !removedTodayEvents.some(removed => removed.summary === event.summary));
-                    await this.databaseService.query(
-                        `UPDATE users SET events_todayChange = ? WHERE name = ?`,
-                        [JSON.stringify(updatedTodayChange), 'Юлия']
-                    );
-                    console.log('Лишние события на сегодня удалены из базы.');
-                }
-    
-                if (removedTomorrowEvents.length > 0) {
-                    console.log('Удаляем лишние события на завтра...');
-                    const updatedTomorrowChange = storedTomorrowChange.filter(event => !removedTomorrowEvents.some(removed => removed.summary === event.summary));
-                    await this.databaseService.query(
-                        `UPDATE users SET events_tomorrowChange = ? WHERE name = ?`,
-                        [JSON.stringify(updatedTomorrowChange), 'Юлия']
-                    );
-                    console.log('Лишние события на завтра удалены из базы.');
-                }
-    
-                console.log('Обновили события в базе данных.');
-            }
-    
-            // Возвращаем два массива: события на сегодня и завтра
-            return { todayEvents, tomorrowEvents };
+                
+                const clients = await this.databaseService.query('SELECT * FROM clients') as any[];
+                
+                // Возвращаем два массива: события на сегодня и завтра
+                const todayClients = mergeEventsWithClients(updatedTodayEvents, clients);
+                const tomorrowClients = mergeEventsWithClients(updatedTomorrowEvents, clients);
+
+                return {
+                    todayClients,
+                    tomorrowClients,
+                };
+            }                                                                
         } catch (err) {
             console.error('Ошибка получения событий:', err.message);
             return { todayEvents: [], tomorrowEvents: [] }; // Возвращаем пустые массивы в случае ошибки
         }
     }
-    
-
-    
 }
+
+function mergeEventsWithClients(events, clients) {
+    return events.map(event => {
+        const client = clients.find(c =>
+            c.name === event.summary || isSimilarName(event.summary, c.name )
+        );
+        if (client && event.marked !== true) {
+            return {
+                ...client,
+                start: event.start,
+                marked: event.marked ?? false,
+            };
+        }
+        return null;
+    }).filter(Boolean); // убираем null
+}
+
+function isSimilarName(eventSummary: string, clientFullName: string): boolean {
+    if (!eventSummary || !clientFullName) return false;
+
+    const normalize = (str: string) =>
+        str.toLowerCase().replace(/[^\wа-яё ]/gi, '').trim();
+
+    const summaryWords = normalize(eventSummary).split(' ');
+    const clientWords = normalize(clientFullName).split(' ');
+
+    if (clientWords.length < 2) return false;
+
+    const [clientSurname, clientName] = clientWords;
+    const clientInitial = clientName[0];
+
+    // Форматы:
+    // 1. Колобов Д
+    // 2. Д Колобов
+    // 3. Колобов Дмитрий
+    // 4. Дмитрий Колобов
+    return summaryWords.some((word, i) => {
+        const otherWord = summaryWords[1 - i];
+        return (
+            (word === clientSurname && (!otherWord || otherWord[0] === clientInitial)) ||
+            (word === clientInitial && otherWord === clientSurname)
+        );
+    });
+}
+

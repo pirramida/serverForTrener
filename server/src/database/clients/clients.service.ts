@@ -98,8 +98,8 @@ export class ClientsService {
       const query = `
         INSERT INTO clients (
           name, phone, age, gender, photo, goal, activityLevel, 
-          injuries, trainingHistory, weight, height, chest, waist, hips, bodyFat
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          injuries, trainingHistory, weight, height, chest, waist, hips, bodyFat, birthDate
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
   
       const values = [
@@ -117,7 +117,9 @@ export class ClientsService {
         form.chest,
         form.waist,
         form.hips,
-        form.bodyFat
+        form.bodyFat,
+        form.birthDate
+
       ];
   
       this.databaseService.getDB().run(query, values, (err) => {

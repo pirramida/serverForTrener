@@ -17,7 +17,7 @@ export class PaymentService {
     }
   }
 
-  async changeSessionsClient(client: { name: string; phone: string }): Promise<any> {
+  async changeSessionsClient(client: { name: string; phone: string }, payload): Promise<any> {
     try {
       // Для месячного обновления статистики!
       // Получаем текущую дату
@@ -89,125 +89,163 @@ export class PaymentService {
         );
       }
 
-
+      let response;
       //-----------------------------------------------------------------
+        // 1. Получаем ID пакета из sessionQueue клиента
+        const currentSessionQueueQuery = `
+          SELECT sessionQueue FROM clients WHERE name = ? AND phone = ?
+        `;
+        const result: { sessionQueue: string | null }[] = await this.databaseService.query(currentSessionQueueQuery, [client.name, client.phone]);
+    
+        // Проверяем, существует ли результат и содержит ли он sessionQueue
+        const currentQueue = result.length > 0 && result[0].sessionQueue
+          ? JSON.parse(result[0].sessionQueue) // Если sessionQueue существует, парсим его
+          : []; // Иначе возвращаем пустой массив
+    
+        // Получаем ID первого пакета из очереди
+        const firstPackageId = currentQueue.length > 0 ? currentQueue[0].id : null;
+        if (!firstPackageId) {
+          throw new Error('Нет пакетов в очереди для списания');
+        }
+    
+        // 2. Получаем текущий пакет из payment_history
+        const packageQuery = `
+          SELECT quantityLeft, status, amount, quantity FROM payment_history WHERE unique_id = ?
+        `;
+        const packageResult: { quantityLeft: number; status: string; amount: number; quantity: number; }[] = await this.databaseService.query(packageQuery, [firstPackageId]);
+    
+        // Проверяем, что результат не пустой
+        if (packageResult.length === 0) {
+          throw new Error('Пакет не найден в payment_history');
+        }
+    
+        // Деструктурируем quantityLeft и status из первого элемента результата
+        const { quantityLeft, status, amount, quantity } = packageResult[0];
+    
+        // 3. Уменьшаем количество тренировок (quantityLeft)
+        let updatedQuantityLeft = quantityLeft - 1;
+        if (payload.action === '' || payload.action === 'writeoff') {
 
-      // 1. Получаем ID пакета из sessionQueue клиента
-      const currentSessionQueueQuery = `
-        SELECT sessionQueue FROM clients WHERE name = ? AND phone = ?
-      `;
-      const result: { sessionQueue: string | null }[] = await this.databaseService.query(currentSessionQueueQuery, [client.name, client.phone]);
-  
-      // Проверяем, существует ли результат и содержит ли он sessionQueue
-      const currentQueue = result.length > 0 && result[0].sessionQueue
-        ? JSON.parse(result[0].sessionQueue) // Если sessionQueue существует, парсим его
-        : []; // Иначе возвращаем пустой массив
-  
-      // Получаем ID первого пакета из очереди
-      const firstPackageId = currentQueue.length > 0 ? currentQueue[0].id : null;
-      if (!firstPackageId) {
-        throw new Error('Нет пакетов в очереди для списания');
-      }
-  
-      // 2. Получаем текущий пакет из payment_history
-      const packageQuery = `
-        SELECT quantityLeft, status, amount, quantity FROM payment_history WHERE unique_id = ?
-      `;
-      const packageResult: { quantityLeft: number; status: string; amount: number; quantity: number; }[] = await this.databaseService.query(packageQuery, [firstPackageId]);
-  
-      // Проверяем, что результат не пустой
-      if (packageResult.length === 0) {
-        throw new Error('Пакет не найден в payment_history');
-      }
-  
-      // Деструктурируем quantityLeft и status из первого элемента результата
-      const { quantityLeft, status, amount, quantity } = packageResult[0];
-  
-      // 3. Уменьшаем количество тренировок (quantityLeft)
-      let updatedQuantityLeft = quantityLeft - 1;
-  
-      // Если количество тренировок стало 0, меняем статус на "Не активен"
-      if (updatedQuantityLeft === 0 && status !== 'Не активен') {
-        // Обновляем статус пакета в payment_history
-        await this.databaseService.query(
-          `
-          UPDATE payment_history 
-          SET quantityLeft = ?, status = 'Не активен'
-          WHERE unique_id = ?
-          `,
-          [updatedQuantityLeft, firstPackageId]
-        );
-  
-        // 4. Удаляем ID текущего пакета из очереди в clients
-        const updatedQueue = currentQueue.slice(1); // Удаляем первый элемент из очереди
-        const updatedQueueString = JSON.stringify(updatedQueue); // Преобразуем в строку
-  
-        // Обновляем sessionQueue клиента
+        // Если количество тренировок стало 0, меняем статус на "Не активен"
+        if (updatedQuantityLeft === 0 && status !== 'Не активен') {
+          // Обновляем статус пакета в payment_history
+          await this.databaseService.query(
+            `
+            UPDATE payment_history 
+            SET quantityLeft = ?, status = 'Не активен'
+            WHERE unique_id = ?
+            `,
+            [updatedQuantityLeft, firstPackageId]
+          );
+    
+          // 4. Удаляем ID текущего пакета из очереди в clients
+          const updatedQueue = currentQueue.slice(1); // Удаляем первый элемент из очереди
+          const updatedQueueString = JSON.stringify(updatedQueue); // Преобразуем в строку
+    
+          // Обновляем sessionQueue клиента
+          await this.databaseService.query(
+            `
+            UPDATE clients
+            SET sessionQueue = ?
+            WHERE name = ? AND phone = ?
+            `,
+            [updatedQueueString, client.name, client.phone]
+          );
+        } else {
+          // Если тренировка не последняя, просто обновляем количество оставшихся тренировок
+          await this.databaseService.query(
+            `
+            UPDATE payment_history 
+            SET quantityLeft = ?
+            WHERE unique_id = ?
+            `,
+            [updatedQuantityLeft, firstPackageId]
+          );
+        }
+    
+        // 5. Обновляем количество сессий у клиента
         await this.databaseService.query(
           `
           UPDATE clients
-          SET sessionQueue = ?
+          SET sessions = CASE 
+              WHEN sessions > 0 THEN sessions - 1 
+              ELSE 0 
+          END
           WHERE name = ? AND phone = ?
           `,
-          [updatedQueueString, client.name, client.phone]
+          [client.name, client.phone]
         );
-      } else {
-        // Если тренировка не последняя, просто обновляем количество оставшихся тренировок
+    
+        // 6. Записываем историю сессий
+        //ID Юлия. Потом поментяь на ID кого угодно!!!
         await this.databaseService.query(
           `
-          UPDATE payment_history 
-          SET quantityLeft = ?
-          WHERE unique_id = ?
+          INSERT INTO session_history (name, phone, action, report, userID)
+          VALUES (?, ?, ?, ?, ?)
           `,
-          [updatedQuantityLeft, firstPackageId]
+          [client.name, Number(client.phone), 'Списание тренировки', JSON.stringify(payload), 1]
         );
-      }
-  
-      // 5. Обновляем количество сессий у клиента
-      await this.databaseService.query(
-        `
-        UPDATE clients
-        SET sessions = CASE 
-            WHEN sessions > 0 THEN sessions - 1 
-            ELSE 0 
-        END
-        WHERE name = ? AND phone = ?
-        `,
-        [client.name, client.phone]
-      );
-  
-      // 6. Записываем историю сессий
-      await this.databaseService.query(
-        `
-        INSERT INTO session_history (name, phone, action)
-        VALUES (?, ?, ?)
-        `,
-        [client.name, Number(client.phone), 'Списание тренировки']
-      );
+      
+        // 7. Возвращаем обновленную информацию
+        response = await this.databaseService.query(
+          'SELECT quantity, quantityLeft FROM payment_history WHERE unique_id = ?',
+          [firstPackageId]
+        );
     
-      // 7. Возвращаем обновленную информацию
-      const response = await this.databaseService.query(
-        'SELECT quantity, quantityLeft FROM payment_history WHERE unique_id = ?',
-        [firstPackageId]
-      );
-  
-      // 8. Расчёт дохода за проведённую тренировку
+        // 8. Расчёт дохода за проведённую тренировку
 
-      // Получаем стоимость одной тренировки
-      const pricePerSession = amount / quantity;
+        // Получаем стоимость одной тренировки
+        const pricePerSession = amount / quantity;
 
-      // Обновляем доход тренера за месяц
+        // Обновляем доход тренера за месяц
+        await this.databaseService.query(
+          `UPDATE users SET 
+            cashInMonth = COALESCE(cashInMonth, 0) + ?, 
+            sessionsInMonth = COALESCE(sessionsInMonth, 0) + 1,
+            totalCash = COALESCE(totalCash, 0) + ?, 
+            totalSessions = COALESCE(totalSessions, 0) + 1
+          WHERE name = ?`,
+          [pricePerSession, pricePerSession, 'Юлия']
+        );
+
+      } else {
+        await this.databaseService.query(
+          `
+          INSERT INTO session_history (name, phone, action, report, userID)
+          VALUES (?, ?, ?, ?, ?)
+          `,
+          [client.name, Number(client.phone), 'Перенесенная тренировка', JSON.stringify(payload), 1]
+        );
+        response = await this.databaseService.query(
+          'SELECT quantity, quantityLeft FROM payment_history WHERE unique_id = ?',
+          [firstPackageId]
+        );
+
+      }
+
+      const results = await this.databaseService.query(
+        'SELECT events_todayChange FROM users WHERE id = ?', ['1']
+      ) as any
+      console.log('events_todayChangeevents_todayChange', results[0].events_todayChange);
+      let events_todayChange = JSON.parse(results[0].events_todayChange);
+      console.log('events_todayChangeevents_todayChangeevents_todayChange', events_todayChange);
+
+      const updatedEvents = events_todayChange.map((item: any) => {
+        if (item.summary === client.name || isSimilarName(item.summary, client.name)) {
+          return {
+            ...item,
+            marked: true,
+          };
+        }
+        return { ...item };
+      });
+      
+      
       await this.databaseService.query(
-        `UPDATE users SET 
-          cashInMonth = COALESCE(cashInMonth, 0) + ?, 
-          sessionsInMonth = COALESCE(sessionsInMonth, 0) + 1,
-          totalCash = COALESCE(totalCash, 0) + ?, 
-          totalSessions = COALESCE(totalSessions, 0) + 1
-        WHERE name = ?`,
-        [pricePerSession, pricePerSession, 'Юлия']
-      );
-
+        'UPDATE users SET events_todayChange = ? WHERE id = ?', [JSON.stringify(updatedEvents), '1']
+      )
       return response;
+
     } catch (error) {
       console.error('Произошла ошибка в процессе выполнения:', error);
       throw error;
@@ -365,4 +403,49 @@ function extractSessionCount(input: any): number {
   }
 
   return 0;
+}
+
+
+function mergeEventsWithClients(events, clients) {
+  return events.map(event => {
+      const client = clients.find(c =>
+          c.name === event.summary || isSimilarName(event.summary, c.name )
+      );
+      if (client && event.marked !== true) {
+          return {
+              ...client,
+              start: event.start,
+              marked: event.marked ?? false,
+          };
+      }
+      return null;
+  }).filter(Boolean); // убираем null
+}
+
+function isSimilarName(eventSummary: string, clientFullName: string): boolean {
+  if (!eventSummary || !clientFullName) return false;
+
+  const normalize = (str: string) =>
+    str.toLowerCase().replace(/[^\wа-яё ]/gi, '').trim();
+
+  const summaryWords = normalize(eventSummary).split(' ');
+  const clientWords = normalize(clientFullName).split(' ');
+
+  if (clientWords.length < 2) return false;
+
+  const [surname, name] = clientWords;
+  const initial = name[0];
+
+  const patterns = [
+    `${surname} ${initial}`,
+    `${initial} ${surname}`,
+    `${surname} ${name}`,
+    `${name} ${surname}`,
+    name,
+    surname,
+  ];
+
+  const normalizedSummary = summaryWords.join(' ');
+
+  return patterns.some(pattern => normalizedSummary.includes(pattern.toLowerCase()));
 }
