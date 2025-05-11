@@ -8,7 +8,7 @@ export class DatabaseService implements OnModuleInit {
   private db: sqlite3.Database;
 
   constructor() {
-    const dbPath = path.resolve(__dirname, '..', '..', 'database.db');
+    const dbPath = path.resolve(__dirname, '..', '..', 'databaseTest.db');
     const dbExists = fs.existsSync(dbPath);
 
     this.db = new sqlite3.Database(dbPath, (err) => {
