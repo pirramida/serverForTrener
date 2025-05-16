@@ -89,7 +89,7 @@ export class PaymentService {
         );
       }
 
-      let response;
+        let response;
       //-----------------------------------------------------------------
         // 1. Получаем ID пакета из sessionQueue клиента
         const currentSessionQueueQuery = `
@@ -124,7 +124,7 @@ export class PaymentService {
     
         // 3. Уменьшаем количество тренировок (quantityLeft)
         let updatedQuantityLeft = quantityLeft - 1;
-        if (payload.action === '' || payload.action === 'writeoff') {
+      if (payload.action === '' || payload.action === 'writeoff' || payload.action === undefined) {
 
         // Если количество тренировок стало 0, меняем статус на "Не активен"
         if (updatedQuantityLeft === 0 && status !== 'Не активен') {
@@ -278,8 +278,6 @@ export class PaymentService {
       return [];
     }
   }
-  
-  
 
   async postNewPaymentHistory(fromData: any): Promise<any> {
     try {
