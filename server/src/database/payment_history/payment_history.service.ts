@@ -295,13 +295,14 @@ export class PaymentService {
       phone,
       method,
       } = fromData;
-  
+      
+
       // 1. Вставляем запись в payment_history
       const query = `
         INSERT INTO payment_history (
           unique_id, date, client, amount, type, status, dateTo, customPaymentType,
-          isExpiryDateManuallySet, notes, phone, method, quantity, quantityLeft
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          isExpiryDateManuallySet, notes, phone, method, quantity, quantityLeft, clientId
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
       
       let sessionCount;
@@ -310,7 +311,9 @@ export class PaymentService {
       } else {
         sessionCount = extractSessionCount(type);
       }
-  
+      
+      const clientId = this.databaseService.query('SELECT id FROM clients WHERE name = ?', [client])
+
       // Вставка в payment_history
       await this.databaseService.run(query, [
         id,
@@ -327,14 +330,16 @@ export class PaymentService {
         method,
         sessionCount,
         sessionCount,
+        clientId,
       ]);
   
       // 2. Получаем текущий sessionQueue клиента
       const currentSessionQueueQuery = `
-        SELECT sessionQueue FROM clients WHERE name = ? AND phone = ?
+        SELECT sessionQueue FROM clients WHERE name = ? OR phone = ? OR clientId = ?
       `;
+      
   
-      const result: { sessionQueue: string | null }[] = await this.databaseService.query(currentSessionQueueQuery, [client, phone]);
+      const result: { sessionQueue: string | null }[] = await this.databaseService.query(currentSessionQueueQuery, [client, phone, clientId]);
   
       // Проверяем, существует ли результат и содержит ли он sessionQueue
       const currentQueue = result.length > 0 && result[0].sessionQueue
@@ -365,10 +370,10 @@ export class PaymentService {
       const updateQueueQuery = `
         UPDATE clients
         SET sessionQueue = ?
-        WHERE name = ? AND phone = ?
+        WHERE name = ? OR phone = ? clientId = ?
       `;
       
-      await this.databaseService.run(updateQueueQuery, [updatedQueueString, client, phone]);
+      await this.databaseService.run(updateQueueQuery, [updatedQueueString, client, phone, clientId]);
   
       return { success: true, message: 'Платеж успешно добавлен!' };
     } catch (error) {
