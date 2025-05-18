@@ -247,7 +247,7 @@ export class UsersService {
             }                                                                
         } catch (err) {
             console.error('Ошибка получения событий:', err.message);
-            return { todayEvents: [], tomorrowEvents: [] }; // Возвращаем пустые массивы в случае ошибки
+            return { todayClients: [], tomorrowClients: [] }; // Возвращаем пустые массивы в случае ошибки
         }
     }
 }
