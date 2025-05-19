@@ -3,7 +3,7 @@ import { ClientsService } from './clients.service';
 
 @Controller('clients')
 export class ClientsController {
-  constructor(private readonly clientsService: ClientsService) {}
+  constructor(private readonly clientsService: ClientsService) { }
 
   @Get()
   async getClients() {
@@ -11,7 +11,7 @@ export class ClientsController {
   }
 
   @Post()
-  async addClient(@Body() body: { form: any}) {
+  async addClient(@Body() body: { form: any }) {
     await this.clientsService.addClient(body.form);
     return { message: 'Клиент добавлен' };
   }

@@ -7,4 +7,4 @@ import { DatabaseService } from '../database.service';
   providers: [PaymentService, DatabaseService],
   controllers: [PaymentController],
 })
-export class PaymentModule {}
+export class PaymentModule { }

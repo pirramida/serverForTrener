@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, OnModuleInit } from '@nestjs/common';
 import * as sqlite3 from 'sqlite3';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -26,6 +26,13 @@ export class DatabaseService implements OnModuleInit {
 
   onModuleInit() {
     console.log('База данных готова');
+  }
+
+  onModuleDestroy() {
+    this.db.close((err) => {
+      if (err) console.error('Ошибка при закрытии БД:', err.message);
+      else console.log('Соединение с БД закрыто');
+    });
   }
 
   private createTables() {
@@ -177,6 +184,7 @@ export class DatabaseService implements OnModuleInit {
     });
   }
 
+
   // Универсальный метод для изменения данных (INSERT, UPDATE, DELETE)
   public run(sql: string, params: any[] = []): Promise<void> {
     return new Promise((resolve, reject) => {
@@ -189,4 +197,36 @@ export class DatabaseService implements OnModuleInit {
       });
     });
   }
+
+  async runTransaction<T>(operations: () => Promise<T>): Promise<T> {
+    return new Promise((resolve, reject) => {
+      this.db.serialize(() => {
+        this.db.run('BEGIN TRANSACTION', (err) => {
+          if (err) {
+            return reject(new HttpException('Transaction start error', HttpStatus.INTERNAL_SERVER_ERROR));
+          }
+
+          operations()
+            .then((result) => {
+              this.db.run('COMMIT', (err) => {
+                if (err) {
+                  this.db.run('ROLLBACK', () => {
+                    return reject(new HttpException('Commit error', HttpStatus.INTERNAL_SERVER_ERROR));
+                  });
+                } else {
+                  resolve(result);
+                }
+              });
+            })
+            .catch((error) => {
+              this.db.run('ROLLBACK', () => {
+                console.error('Откат транзакции по причине ошибки: ', error);
+                reject(error);
+              });
+            });
+        });
+      });
+    });
+  }
+
 }

@@ -3,7 +3,7 @@ import { UsersService } from './users.service';
 
 @Controller('users')
 export class UsersController {
-  constructor(private readonly userService: UsersService) {}
+  constructor(private readonly userService: UsersService) { }
 
   @Get()
   async getAllStatisticUser() {
@@ -24,7 +24,7 @@ export class UsersController {
       throw new HttpException('Не удалось получить события', HttpStatus.BAD_REQUEST);
     }
 
-    return {message: true, events: events};
+    return { message: true, events: events };
   }
 
   @Post('refresh')
@@ -33,7 +33,7 @@ export class UsersController {
     const CLIENT_ID = "362002328679-n4uqn1arfofigtuur8po169gds8lrh76.apps.googleusercontent.com";
     const CLIENT_SECRET = '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';
     const REDIRECT_URI = 'postmessage'; // используем "postmessage" при offline access
-  
+
     const response = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
       body: new URLSearchParams({
@@ -47,13 +47,13 @@ export class UsersController {
         'Content-Type': 'application/x-www-form-urlencoded'
       }
     });
-  
+
     const data = await response.json();
-  
+
     if (!data.refresh_token) {
       console.warn('⚠️ Не получен refresh_token:', data);
     }
-  
+
     return data;
   }
 
@@ -64,8 +64,8 @@ export class UsersController {
     if (!response) { throw new HttpException('Не удалось записать прошедшую тренировку', HttpStatus.BAD_REQUEST) }
     return response;
   }
-  
 
 
-  
+
+
 }

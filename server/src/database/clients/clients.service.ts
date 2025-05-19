@@ -5,7 +5,7 @@ import { HttpException, HttpStatus } from '@nestjs/common';
 
 @Injectable()
 export class ClientsService {
-  constructor(private readonly databaseService: DatabaseService) {}
+  constructor(private readonly databaseService: DatabaseService) { }
 
   getAllClients(): Promise<any[]> {
     return new Promise((resolve, reject) => {
@@ -30,68 +30,96 @@ export class ClientsService {
     }
   }
 
-  async changeClient(phoneNumber: any, form: any): Promise<void> {
+  async changeClient(phoneNumber: any, form: any): Promise<any> {
     try {
-      // Получаем данные клиента по номеру телефона
-      const changeClient = await this.databaseService.query('SELECT * FROM clients WHERE phone = ?', [phoneNumber]);
+      let newDataClient: any[] = [];
 
-      // Проверяем, если клиент не найден
-      if (changeClient.length === 0) {
-        throw new HttpException(`Ошибка при изменении клиента с номером ${phoneNumber}: клиент не найден`, HttpStatus.BAD_REQUEST);
-      }
-  
-      // Обновляем данные клиента
-      const query = `
-        UPDATE clients SET
-          name = ?, 
-          age = ?, 
-          gender = ?, 
-          photo = ?, 
-          goal = ?, 
-          activityLevel = ?, 
-          injuries = ?, 
-          trainingHistory = ?, 
-          weight = ?, 
-          height = ?, 
-          chest = ?, 
-          waist = ?, 
-          hips = ?, 
-          bodyFat = ?,
-          phone = ?
-        WHERE id = ?
-      `;
-  
-      const values = [
-        form.name,
-        form.age,
-        form.gender,
-        form.photo,
-        form.goal,
-        form.activityLevel,
-        form.injuries,
-        form.trainingHistory,
-        form.weight,
-        form.height,
-        form.chest,
-        form.waist,
-        form.hips,
-        form.bodyFat,
-        form.phone,
-        (changeClient[0] as any).id
-      ];
+      await this.databaseService.runTransaction(async () => {
+        // Получаем клиента
+        const client = await this.databaseService.query(
+          'SELECT * FROM clients WHERE phone = ?',
+          [phoneNumber]
+        ) as any;
 
-  
-      // Выполняем обновление
-      await this.databaseService.run(query, values);
-      const newDataClient = await this.databaseService.query('SELECT * FROM clients WHERE id = ?', [(changeClient[0] as any).id]);
-      return (newDataClient as any);
+        if (client.length === 0) {
+          throw new HttpException(
+            `Ошибка при изменении клиента с номером ${phoneNumber}: клиент не найден`,
+            HttpStatus.BAD_REQUEST
+          );
+        }
+
+        const id = (client[0] as any).id;
+
+        const query = `
+          UPDATE clients SET
+            name = ?, 
+            age = ?, 
+            gender = ?, 
+            photo = ?, 
+            goal = ?, 
+            activityLevel = ?, 
+            injuries = ?, 
+            trainingHistory = ?, 
+            weight = ?, 
+            height = ?, 
+            chest = ?, 
+            waist = ?, 
+            hips = ?, 
+            bodyFat = ?,
+            phone = ?,
+            birthDate = ?
+          WHERE id = ?
+        `;
+
+        if (client[0].birthDate !== form.dateOfBirth) {
+          const birthDate = new Date(form.dateOfBirth);
+          const today = new Date();
+
+          let age = today.getFullYear() - birthDate.getFullYear();
+          const m = today.getMonth() - birthDate.getMonth();
+
+          if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+            age--;
+          }
+
+          form.age = age;
+        }
+
+        const values = [
+          form.name,
+          form.age,
+          form.gender,
+          form.photo,
+          form.goal,
+          form.activityLevel,
+          form.injuries,
+          form.trainingHistory,
+          form.weight,
+          form.height,
+          form.chest,
+          form.waist,
+          form.hips,
+          form.bodyFat,
+          form.phone,
+          form.dateOfBirth,
+          id
+        ];
+
+        await this.databaseService.run(query, values);
+
+        // Получаем обновлённого клиента
+        newDataClient = await this.databaseService.query('SELECT * FROM clients WHERE id = ?', [id]);
+      });
+
+      return newDataClient;
     } catch (error) {
-      console.log(`Ошибка при изменении клиента с номером ${phoneNumber}:`, error);
-      throw new HttpException(`Ошибка при изменении клиента с номером ${phoneNumber}:`, HttpStatus.INTERNAL_SERVER_ERROR);
+      console.error(`Ошибка при изменении клиента с номером ${phoneNumber}:`, error);
+      throw new HttpException(
+        `Ошибка при изменении клиента с номером ${phoneNumber}: ${error.message || ''}`,
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
     }
   }
-  
-  
 
   addClient(form: any): Promise<void> {
     return new Promise((resolve, reject) => {
@@ -101,7 +129,7 @@ export class ClientsService {
           injuries, trainingHistory, weight, height, chest, waist, hips, bodyFat, birthDate
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
-  
+
       const values = [
         form.name,
         form.phone,
@@ -121,7 +149,7 @@ export class ClientsService {
         form.birthDate
 
       ];
-  
+
       this.databaseService.getDB().run(query, values, (err) => {
         if (err) {
           console.error('Ошибка при добавлении клиента:', err);

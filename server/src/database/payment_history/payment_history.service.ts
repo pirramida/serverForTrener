@@ -5,7 +5,7 @@ import { HttpException, HttpStatus } from '@nestjs/common';
 
 @Injectable()
 export class PaymentService {
-  constructor(private readonly databaseService: DatabaseService) {}
+  constructor(private readonly databaseService: DatabaseService) { }
 
 
   async getAllPaymentHistory(): Promise<any[]> {
@@ -19,253 +19,185 @@ export class PaymentService {
 
   async changeSessionsClient(client: { name: string; phone: string }, payload): Promise<any> {
     try {
-      // Для месячного обновления статистики!
-      // Получаем текущую дату
-      const now = new Date();
-      const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      const response = await this.databaseService.runTransaction(async () => {
+        console.log('[TX] Транзакция началась');
 
-      // Получаем дату последнего сброса
-      const resetResult: { lastReset: string | null }[] = await this.databaseService.query(
-        `SELECT lastReset FROM users WHERE name = ?`,
-        ['Юлия']
-      );
+        const now = new Date();
+        const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
-      const lastReset = resetResult.length > 0 ? resetResult[0].lastReset : null;
-      const lastResetMonth = lastReset?.slice(0, 7); // YYYY-MM
+        console.log('[TX] Текущий месяц:', currentMonth);
 
-      if (lastResetMonth !== currentMonth) {
-        // Получаем текущие значения
-        const userData: {
-          cashInMonth: number;
-          sessionsInMonth: number;
-          newClientsInMonth: number;
-        }[] = await this.databaseService.query(
-          `SELECT cashInMonth, sessionsInMonth, newClientsInMonth FROM users WHERE name = ?`,
+        const resetResult = await this.databaseService.query(
+          `SELECT lastReset FROM users WHERE name = ?`,
           ['Юлия']
-        );
+        ) as any;
+        console.log('[TX] lastReset result:', resetResult);
 
-        const { cashInMonth, sessionsInMonth, newClientsInMonth } = userData[0];
+        const lastReset = resetResult.length > 0 ? resetResult[0].lastReset : null;
+        const lastResetMonth = lastReset?.slice(0, 7);
+        console.log('[TX] lastResetMonth:', lastResetMonth);
 
-        // Период — это месяц, за который собираем статистику (предыдущий)
-        const previousMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        const period = `${previousMonthDate.getFullYear()}-${String(previousMonthDate.getMonth() + 1).padStart(2, '0')}`;
+        if (lastResetMonth !== currentMonth) {
+          console.log('[TX] Обновляем статистику за прошлый месяц');
 
-        // Поменять на id user настоящий. Пока что один пользователь 1 id 
-        const user_id = 1
-        // Сохраняем статистику
-        await this.databaseService.query(
-          `
-          INSERT INTO statistic (
+          const userData = await this.databaseService.query(
+            `SELECT cashInMonth, sessionsInMonth, newClientsInMonth FROM users WHERE name = ?`,
+            ['Юлия']
+          ) as any;
+          console.log('[TX] userData:', userData);
+
+          const { cashInMonth, sessionsInMonth, newClientsInMonth } = userData[0];
+
+          const previousMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+          const period = `${previousMonthDate.getFullYear()}-${String(previousMonthDate.getMonth() + 1).padStart(2, '0')}`;
+
+          await this.databaseService.query(
+            `INSERT INTO statistic (
             cashInMonth,
             sessionsInMonth,
             clientsInMonth,
             period,
             createdAt,
             user_id
-          ) VALUES (?, ?, ?, ?, ?, ?)
-          `,
-          [
-            cashInMonth,
-            sessionsInMonth,
-            newClientsInMonth,
-            period,
-            now.toISOString(),
-            user_id
-          ]
-        );
+          ) VALUES (?, ?, ?, ?, ?, ?)`
+            ,
+            [cashInMonth, sessionsInMonth, newClientsInMonth, period, now.toISOString(), 1]
+          );
+          console.log('[TX] Сохранили статистику за период:', period);
 
-        // Обнуляем поля
-        await this.databaseService.query(
-          `
-          UPDATE users
-          SET 
-            cashInMonth = 0,
-            sessionsInMonth = 0,
-            newClientsInMonth = 0,
-            lastReset = ?
-          WHERE name = ?
-          `,
-          [now.toISOString(), 'Юлия']
-        );
-      }
+          await this.databaseService.query(
+            `UPDATE users SET cashInMonth = 0, sessionsInMonth = 0, newClientsInMonth = 0, lastReset = ? WHERE name = ?`,
+            [now.toISOString(), 'Юлия']
+          );
+          console.log('[TX] Обнулили поля статистики');
+        }
+
+        console.log('[TX] Ищем клиента:', client.name);
+        const clientIdResult = await this.databaseService.query('SELECT id FROM clients WHERE name = ?', [client.name]) as any;
+        const clientId = clientIdResult[0]?.id;
+        console.log('[TX] clientId:', clientId);
+
+        const result = await this.databaseService.query(`SELECT sessionQueue FROM clients WHERE id = ?`, [clientId]) as any;
+        console.log('[TX] sessionQueue result:', result);
+
+        const currentQueue = result.length > 0 && result[0].sessionQueue ? JSON.parse(result[0].sessionQueue) : [];
+        const firstPackageId = currentQueue.length > 0 ? currentQueue[0].id : null;
+        console.log('[TX] firstPackageId:', firstPackageId);
+
+        if (!firstPackageId) throw new Error('Нет пакетов в очереди для списания');
+
+        const packageResult = await this.databaseService.query(
+          `SELECT quantityLeft, status, amount, quantity FROM payment_history WHERE unique_id = ?`,
+          [firstPackageId]
+        ) as any;
+        console.log('[TX] packageResult:', packageResult);
+
+        if (packageResult.length === 0) throw new Error('Пакет не найден в payment_history');
+
+        const { quantityLeft, status, amount, quantity } = packageResult[0];
+        let updatedQuantityLeft = quantityLeft - 1;
 
         let response;
-      //-----------------------------------------------------------------
-        // 1. Получаем ID пакета из sessionQueue клиента
-        const currentSessionQueueQuery = `
-          SELECT sessionQueue FROM clients WHERE name = ? AND phone = ?
-        `;
-        const result: { sessionQueue: string | null }[] = await this.databaseService.query(currentSessionQueueQuery, [client.name, client.phone]);
-    
-        // Проверяем, существует ли результат и содержит ли он sessionQueue
-        const currentQueue = result.length > 0 && result[0].sessionQueue
-          ? JSON.parse(result[0].sessionQueue) // Если sessionQueue существует, парсим его
-          : []; // Иначе возвращаем пустой массив
-    
-        // Получаем ID первого пакета из очереди
-        const firstPackageId = currentQueue.length > 0 ? currentQueue[0].id : null;
-        if (!firstPackageId) {
-          throw new Error('Нет пакетов в очереди для списания');
-        }
-    
-        // 2. Получаем текущий пакет из payment_history
-        const packageQuery = `
-          SELECT quantityLeft, status, amount, quantity FROM payment_history WHERE unique_id = ?
-        `;
-        const packageResult: { quantityLeft: number; status: string; amount: number; quantity: number; }[] = await this.databaseService.query(packageQuery, [firstPackageId]);
-    
-        // Проверяем, что результат не пустой
-        if (packageResult.length === 0) {
-          throw new Error('Пакет не найден в payment_history');
-        }
-    
-        // Деструктурируем quantityLeft и status из первого элемента результата
-        const { quantityLeft, status, amount, quantity } = packageResult[0];
-    
-        // 3. Уменьшаем количество тренировок (quantityLeft)
-        let updatedQuantityLeft = quantityLeft - 1;
-      if (payload.action === '' || payload.action === 'writeoff' || payload.action === undefined) {
 
-        // Если количество тренировок стало 0, меняем статус на "Не активен"
-        if (updatedQuantityLeft === 0 && status !== 'Не активен') {
-          // Обновляем статус пакета в payment_history
+        if (payload.action === '' || payload.action === 'writeoff' || payload.action === undefined) {
+          console.log('[TX] Списание тренировки. Осталось:', updatedQuantityLeft);
+
+          if (updatedQuantityLeft === 0 && status !== 'Не активен') {
+            await this.databaseService.query(
+              `UPDATE payment_history SET quantityLeft = ?, status = 'Не активен' WHERE unique_id = ?`,
+              [updatedQuantityLeft, firstPackageId]
+            );
+            const updatedQueue = currentQueue.slice(1);
+            await this.databaseService.query(
+              `UPDATE clients SET sessionQueue = ? WHERE id = ?`,
+              [JSON.stringify(updatedQueue), clientId]
+            );
+            console.log('[TX] Обновили очередь и статус пакета');
+          } else {
+            await this.databaseService.query(
+              `UPDATE payment_history SET quantityLeft = ? WHERE unique_id = ?`,
+              [updatedQuantityLeft, firstPackageId]
+            );
+            console.log('[TX] Уменьшили quantityLeft');
+          }
+
           await this.databaseService.query(
-            `
-            UPDATE payment_history 
-            SET quantityLeft = ?, status = 'Не активен'
-            WHERE unique_id = ?
-            `,
-            [updatedQuantityLeft, firstPackageId]
+            `UPDATE clients SET sessions = CASE WHEN sessions > 0 THEN sessions - 1 ELSE 0 END WHERE id = ?`,
+            [clientId]
           );
-    
-          // 4. Удаляем ID текущего пакета из очереди в clients
-          const updatedQueue = currentQueue.slice(1); // Удаляем первый элемент из очереди
-          const updatedQueueString = JSON.stringify(updatedQueue); // Преобразуем в строку
-    
-          // Обновляем sessionQueue клиента
+          console.log('[TX] Обновили sessions клиента');
+
           await this.databaseService.query(
-            `
-            UPDATE clients
-            SET sessionQueue = ?
-            WHERE name = ? AND phone = ?
-            `,
-            [updatedQueueString, client.name, client.phone]
+            `INSERT INTO session_history (name, phone, action, report, userID, clientId) VALUES (?, ?, ?, ?, ?, ?)`,
+            [client.name, Number(client.phone), 'Списание тренировки', JSON.stringify(payload), 1, clientId]
           );
+          console.log('[TX] Добавили в историю сессий');
+
+          response = await this.databaseService.query(
+            `SELECT quantity, quantityLeft FROM payment_history WHERE unique_id = ?`,
+            [firstPackageId]
+          );
+
+          const pricePerSession = amount / quantity;
+          await this.databaseService.query(
+            `UPDATE users SET cashInMonth = COALESCE(cashInMonth, 0) + ?, sessionsInMonth = COALESCE(sessionsInMonth, 0) + 1, totalCash = COALESCE(totalCash, 0) + ?, totalSessions = COALESCE(totalSessions, 0) + 1 WHERE name = ?`,
+            [pricePerSession, pricePerSession, 'Юлия']
+          );
+          console.log('[TX] Обновили доход тренера');
         } else {
-          // Если тренировка не последняя, просто обновляем количество оставшихся тренировок
           await this.databaseService.query(
-            `
-            UPDATE payment_history 
-            SET quantityLeft = ?
-            WHERE unique_id = ?
-            `,
-            [updatedQuantityLeft, firstPackageId]
+            `INSERT INTO session_history (name, phone, action, report, userID, clientId) VALUES (?, ?, ?, ?, ?, ?)`,
+            [client.name, Number(client.phone), 'Перенесенная тренировка', JSON.stringify(payload), 1, clientId]
           );
+          response = await this.databaseService.query(
+            `SELECT quantity, quantityLeft FROM payment_history WHERE unique_id = ?`,
+            [firstPackageId]
+          );
+          console.log('[TX] Перенос тренировки');
         }
-    
-        // 5. Обновляем количество сессий у клиента
+
+        const results = await this.databaseService.query(
+          `SELECT events_todayChange FROM users WHERE id = ?`, ['1']
+        ) as any;
+        const events_todayChange = JSON.parse(results[0].events_todayChange);
+        const updatedEvents = events_todayChange.map((item: any) => {
+          if (item.summary === client.name || isSimilarName(item.summary, client.name)) {
+            return { ...item, marked: true };
+          }
+          return { ...item };
+        });
+
         await this.databaseService.query(
-          `
-          UPDATE clients
-          SET sessions = CASE 
-              WHEN sessions > 0 THEN sessions - 1 
-              ELSE 0 
-          END
-          WHERE name = ? AND phone = ?
-          `,
-          [client.name, client.phone]
+          `UPDATE users SET events_todayChange = ? WHERE id = ?`, [JSON.stringify(updatedEvents), '1']
         );
-    
-        // 6. Записываем историю сессий
-        //ID Юлия. Потом поментяь на ID кого угодно!!!
-        await this.databaseService.query(
-          `
-          INSERT INTO session_history (name, phone, action, report, userID)
-          VALUES (?, ?, ?, ?, ?)
-          `,
-          [client.name, Number(client.phone), 'Списание тренировки', JSON.stringify(payload), 1]
-        );
-      
-        // 7. Возвращаем обновленную информацию
-        response = await this.databaseService.query(
-          'SELECT quantity, quantityLeft FROM payment_history WHERE unique_id = ?',
-          [firstPackageId]
-        );
-    
-        // 8. Расчёт дохода за проведённую тренировку
+        console.log('[TX] Обновили события пользователя');
 
-        // Получаем стоимость одной тренировки
-        const pricePerSession = amount / quantity;
-
-        // Обновляем доход тренера за месяц
-        await this.databaseService.query(
-          `UPDATE users SET 
-            cashInMonth = COALESCE(cashInMonth, 0) + ?, 
-            sessionsInMonth = COALESCE(sessionsInMonth, 0) + 1,
-            totalCash = COALESCE(totalCash, 0) + ?, 
-            totalSessions = COALESCE(totalSessions, 0) + 1
-          WHERE name = ?`,
-          [pricePerSession, pricePerSession, 'Юлия']
-        );
-
-      } else {
-        await this.databaseService.query(
-          `
-          INSERT INTO session_history (name, phone, action, report, userID)
-          VALUES (?, ?, ?, ?, ?)
-          `,
-          [client.name, Number(client.phone), 'Перенесенная тренировка', JSON.stringify(payload), 1]
-        );
-        response = await this.databaseService.query(
-          'SELECT quantity, quantityLeft FROM payment_history WHERE unique_id = ?',
-          [firstPackageId]
-        );
-
-      }
-
-      const results = await this.databaseService.query(
-        'SELECT events_todayChange FROM users WHERE id = ?', ['1']
-      ) as any
-      console.log('events_todayChangeevents_todayChange', results[0].events_todayChange);
-      let events_todayChange = JSON.parse(results[0].events_todayChange);
-      console.log('events_todayChangeevents_todayChangeevents_todayChange', events_todayChange);
-
-      const updatedEvents = events_todayChange.map((item: any) => {
-        if (item.summary === client.name || isSimilarName(item.summary, client.name)) {
-          return {
-            ...item,
-            marked: true,
-          };
-        }
-        return { ...item };
+        console.log('[TX] Транзакция завершена успешно', response);
+        return response;
       });
-      
-      
-      await this.databaseService.query(
-        'UPDATE users SET events_todayChange = ? WHERE id = ?', [JSON.stringify(updatedEvents), '1']
-      )
-      return response;
 
+      console.log('[TX] Финальный ответ:', response);
+      return response;
     } catch (error) {
       console.error('Произошла ошибка в процессе выполнения:', error);
       throw error;
     }
   }
-  
+
+
 
   async getQuantity(client: any): Promise<any[]> {
     try {
-      console.log(client);
       const currentSessionQueueQuery = `
-        SELECT sessionQueue FROM clients WHERE name = ? AND phone = ? AND id = ?
+        SELECT sessionQueue FROM clients WHERE id = ?
       `;
-      const result: { sessionQueue: string | null }[] = await this.databaseService.query(currentSessionQueueQuery, [client.name, client.phone, client.id]);
+      const result: { sessionQueue: string | null }[] = await this.databaseService.query(currentSessionQueueQuery, [client.id]);
       console.log(result)
       // Проверяем, существует ли результат и содержит ли он sessionQueue
       const currentQueue = result.length > 0 && result[0].sessionQueue
         ? JSON.parse(result[0].sessionQueue) // Если sessionQueue существует, парсим его
         : []; // Иначе возвращаем пустой массив
-        console.log(currentQueue)
+      console.log(currentQueue)
 
       // Получаем ID первого пакета из очереди
       const firstPackageId = currentQueue.length > 0 ? currentQueue[0].id : null;
@@ -291,11 +223,11 @@ export class PaymentService {
         dateTo,
         customPaymentType,
         isExpiryDateManuallySet,
-      notes,
-      phone,
-      method,
+        notes,
+        phone,
+        method,
       } = fromData;
-      
+
 
       // 1. Вставляем запись в payment_history
       const query = `
@@ -304,78 +236,83 @@ export class PaymentService {
           isExpiryDateManuallySet, notes, phone, method, quantity, quantityLeft, clientId
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
-      
+
       let sessionCount;
       if (type === 'Другое') {
         sessionCount = extractSessionCount(customPaymentType);
       } else {
         sessionCount = extractSessionCount(type);
       }
-      
-      const clientId = this.databaseService.query('SELECT id FROM clients WHERE name = ?', [client])
 
-      // Вставка в payment_history
-      await this.databaseService.run(query, [
-        id,
-        date,
-        client,
-        amount,
-        type,
-        status,
-        dateTo,
-        customPaymentType,
-        isExpiryDateManuallySet,
-        notes,
-        phone,
-        method,
-        sessionCount,
-        sessionCount,
-        clientId,
-      ]);
-  
-      // 2. Получаем текущий sessionQueue клиента
-      const currentSessionQueueQuery = `
-        SELECT sessionQueue FROM clients WHERE name = ? OR phone = ? OR clientId = ?
-      `;
-      
-  
-      const result: { sessionQueue: string | null }[] = await this.databaseService.query(currentSessionQueueQuery, [client, phone, clientId]);
-  
-      // Проверяем, существует ли результат и содержит ли он sessionQueue
-      const currentQueue = result.length > 0 && result[0].sessionQueue
-        ? JSON.parse(result[0].sessionQueue) // Если sessionQueue существует, парсим его
-        : []; // Иначе возвращаем пустой массив
-  
-      // 3. Добавляем новый пакет в sessionQueue
-      const newPackage = {
-        id: id,
-        dateTo: dateTo, // Срок окончания нового пакета
-      };
-  
-      // 4. Если количество сессий = 1, добавляем эту тренировку в начало массива, иначе — в конец
-      let updatedQueue: any[];
-  
-      if (sessionCount === 1) {
-        updatedQueue = [newPackage, ...currentQueue]; // Вставляем в начало
-      } else {
-        updatedQueue = [...currentQueue, newPackage]; // Вставляем в конец
-      }
-  
-      // 5. Сортируем массив по дате окончания
-      updatedQueue.sort((a, b) => new Date(a.dateTo).getTime() - new Date(b.dateTo).getTime());
-  
-      // 6. Обновляем sessionQueue клиента
-      const updatedQueueString = JSON.stringify(updatedQueue);
-  
-      const updateQueueQuery = `
+      const clientIdResult = await this.databaseService.query('SELECT id FROM clients WHERE name = ?', [client]) as any[]
+      const clientId = clientIdResult[0]?.id;
+
+      const response = await this.databaseService.runTransaction(async () => {
+
+        // Вставка в payment_history
+        await this.databaseService.run(query, [
+          id,
+          date,
+          client,
+          amount,
+          type,
+          status,
+          dateTo,
+          customPaymentType,
+          isExpiryDateManuallySet,
+          notes,
+          phone,
+          method,
+          sessionCount,
+          sessionCount,
+          clientId,
+        ]);
+
+        // 2. Получаем текущий sessionQueue клиента
+        const currentSessionQueueQuery = `
+        SELECT sessionQueue FROM clients WHERE id = ?
+        `;
+
+
+        const result: { sessionQueue: string | null }[] = await this.databaseService.query(currentSessionQueueQuery, [clientId]);
+
+        // Проверяем, существует ли результат и содержит ли он sessionQueue
+        const currentQueue = result.length > 0 && result[0].sessionQueue
+          ? JSON.parse(result[0].sessionQueue) // Если sessionQueue существует, парсим его
+          : []; // Иначе возвращаем пустой массив
+
+        // 3. Добавляем новый пакет в sessionQueue
+        const newPackage = {
+          id: id,
+          dateTo: dateTo, // Срок окончания нового пакета
+        };
+
+        // 4. Если количество сессий = 1, добавляем эту тренировку в начало массива, иначе — в конец
+        let updatedQueue: any[];
+
+        if (sessionCount === 1) {
+          updatedQueue = [newPackage, ...currentQueue]; // Вставляем в начало
+        } else {
+          updatedQueue = [...currentQueue, newPackage]; // Вставляем в конец
+        }
+
+        // 5. Сортируем массив по дате окончания
+        updatedQueue.sort((a, b) => new Date(a.dateTo).getTime() - new Date(b.dateTo).getTime());
+
+        // 6. Обновляем sessionQueue клиента
+        const updatedQueueString = JSON.stringify(updatedQueue);
+
+        const updateQueueQuery = `
         UPDATE clients
         SET sessionQueue = ?
-        WHERE name = ? OR phone = ? clientId = ?
-      `;
-      
-      await this.databaseService.run(updateQueueQuery, [updatedQueueString, client, phone, clientId]);
-  
-      return { success: true, message: 'Платеж успешно добавлен!' };
+        WHERE id = ?
+        `;
+
+        await this.databaseService.run(updateQueueQuery, [updatedQueueString, clientId]);
+
+        return { success: true, message: 'Платеж успешно добавлен!' };
+      });
+      return response;
     } catch (error) {
       console.error('Произошла неудача при внесении транзакции в приложение ', error);
       throw new HttpException(
@@ -384,7 +321,7 @@ export class PaymentService {
       );
     }
   }
-      
+
 }
 
 function extractSessionCount(input: any): number {
@@ -411,17 +348,17 @@ function extractSessionCount(input: any): number {
 
 function mergeEventsWithClients(events, clients) {
   return events.map(event => {
-      const client = clients.find(c =>
-          c.name === event.summary || isSimilarName(event.summary, c.name )
-      );
-      if (client && event.marked !== true) {
-          return {
-              ...client,
-              start: event.start,
-              marked: event.marked ?? false,
-          };
-      }
-      return null;
+    const client = clients.find(c =>
+      c.name === event.summary || isSimilarName(event.summary, c.name)
+    );
+    if (client && event.marked !== true) {
+      return {
+        ...client,
+        start: event.start,
+        marked: event.marked ?? false,
+      };
+    }
+    return null;
   }).filter(Boolean); // убираем null
 }
 
