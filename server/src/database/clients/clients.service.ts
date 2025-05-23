@@ -30,6 +30,17 @@ export class ClientsService {
     }
   }
 
+  async changeParametrs(corrections: any, parameters: any, primary: any): Promise<any> {
+    try {
+      await this.databaseService.query('PATCH ')
+      return
+    } catch (error) {
+      console.error(`Проблема с изменением параметров клиента`, error);
+      throw new HttpException('Проблема с изменением параметров клиента' , HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+  }
+
   async changeClient(phoneNumber: any, form: any): Promise<any> {
     try {
       let newDataClient: any[] = [];

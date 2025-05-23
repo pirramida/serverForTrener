@@ -27,4 +27,10 @@ export class ClientsController {
     const newClientData = await this.clientsService.changeClient(body.phoneNumber, body.form);
     return { data: newClientData, message: 'Данные пользователя обновлены!' }
   }
+
+  @Patch()
+  async changeParametrs(@Body() body: { corrections: any, parameters: any, primary: any }) {
+    const newParametrs = await this.clientsService.changeParametrs(body.corrections, body.parameters, body.primary);
+    return true;
+  }
 }
