@@ -6,8 +6,9 @@ import { ClientsModule } from './database/clients/clients.module';
 import { PaymentModule } from './database/payment_history/payment_history.module';
 import { UsersModule } from './database/users/users.module'
 import { SessionModule } from './database/session_history/session_history.module';
+import { ClientsFotoModule } from './database/clients_foto/clients._foto.module';
 @Module({
-  imports: [DatabaseModule, ClientsModule, PaymentModule, UsersModule, SessionModule],
+  imports: [DatabaseModule, ClientsModule, PaymentModule, UsersModule, SessionModule, ClientsFotoModule],
   controllers: [AppController],
   providers: [AppService],
 })

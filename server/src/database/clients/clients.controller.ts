@@ -1,13 +1,29 @@
-import { Controller, Get, Post, Body, Delete, Patch } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Delete,
+  Patch,
+  Query,
+} from '@nestjs/common';
 import { ClientsService } from './clients.service';
 
 @Controller('clients')
 export class ClientsController {
-  constructor(private readonly clientsService: ClientsService) { }
+  constructor(private readonly clientsService: ClientsService) {}
 
   @Get()
   async getClients() {
     return await this.clientsService.getAllClients();
+  }
+
+  @Get('/customGet')
+  async customGet(
+    @Query('clientId') clientId: number,
+    @Query('nameColoumn') nameColoumn?: string,
+  ): Promise<any> {
+    return this.clientsService.customGet(clientId, nameColoumn);
   }
 
   @Post()
@@ -23,14 +39,29 @@ export class ClientsController {
   }
 
   @Patch()
-  async changeClient(@Body() body: { phoneNumber: any, form: any }) {
-    const newClientData = await this.clientsService.changeClient(body.phoneNumber, body.form);
-    return { data: newClientData, message: 'Данные пользователя обновлены!' }
+  async changeClient(@Body() body: { phoneNumber: any; form: any }) {
+    const newClientData = await this.clientsService.changeClient(
+      body.phoneNumber,
+      body.form,
+    );
+    return { data: newClientData, message: 'Данные пользователя обновлены!' };
   }
 
-  @Patch()
-  async changeParametrs(@Body() body: { corrections: any, parameters: any, primary: any }) {
-    const newParametrs = await this.clientsService.changeParametrs(body.corrections, body.parameters, body.primary);
-    return true;
+  @Patch('/changeParametrs')
+  async changeParametrs(
+    @Body()
+    body: {
+      data: any;
+
+      clientId: number;
+    },
+  ) {
+    const newParametrs = await this.clientsService.changeParametrs(
+      body.data.corrections,
+      body.data.parameters,
+      body.data.primary,
+      body.clientId,
+    );
+    return newParametrs;
   }
 }

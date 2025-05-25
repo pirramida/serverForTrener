@@ -1,11 +1,25 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import { join } from 'path';
+import * as express from 'express';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // ✅ Раздача статики
+  app.use('/uploads', express.static(join(__dirname, '..', 'uploads')));
+
+
+  // ✅ CORS
+  const allowedOrigins = [
+    'http://localhost:3000', // React dev
+    'https://your-prod-frontend.com', // продакшен-домен, если есть
+  ];
+
   app.enableCors({
     origin: (origin, callback) => {
-      if (!origin || origin.includes('localhost')) {
+      if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
         callback(new Error('Not allowed by CORS'));
@@ -13,10 +27,10 @@ async function bootstrap() {
     },
     credentials: true,
   });
-  await app.listen(5000);                                 // uncomment for prods
-  console.log('Сервер запущен на http://localhost:5000'); // uncomment for prods
 
-  // await app.listen(5000, '0.0.0.0');
-  // console.log('Сервер запущен и доступен в сети');
+  // ✅ Запуск
+  const PORT = 5000;
+  await app.listen(PORT);
+  console.log(`Сервер запущен на http://localhost:${PORT}`);
 }
 bootstrap();
