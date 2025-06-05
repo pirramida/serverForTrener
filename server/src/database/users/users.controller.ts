@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Body, HttpException, HttpStatus, UnauthorizedException } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Query, HttpException, HttpStatus, UnauthorizedException } from '@nestjs/common';
 import { UsersService } from './users.service';
 
 @Controller('users')
@@ -9,6 +9,14 @@ export class UsersController {
   @Get()
   async getAllStatisticUser() {
     return await this.userService.getAllStatisticUser();
+  }
+
+  @Get('/customGet')
+  async customGet(
+    @Query('userId') userId: number,
+    @Query('nameColoumn') nameColoumn?: string,
+  ): Promise<any> {
+    return this.userService.customGet(userId, nameColoumn);
   }
 
   @Patch()
@@ -22,7 +30,10 @@ export class UsersController {
     const events = await this.userService.getGoogleCalendarEvents();
 
     if (!events) {
-      throw new HttpException('Не удалось получить события', HttpStatus.BAD_REQUEST);
+      throw new HttpException(
+        'Не удалось получить события',
+        HttpStatus.BAD_REQUEST,
+      );
     }
 
     return { message: true, events: events };
@@ -31,7 +42,8 @@ export class UsersController {
   @Post('refresh')
   async exchangeCodeForTokens(@Body() body: any) {
     const code = body.code;
-    const CLIENT_ID = "362002328679-n4uqn1arfofigtuur8po169gds8lrh76.apps.googleusercontent.com";
+    const CLIENT_ID =
+      '362002328679-n4uqn1arfofigtuur8po169gds8lrh76.apps.googleusercontent.com';
     const CLIENT_SECRET = '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';
     const REDIRECT_URI = 'postmessage'; // используем "postmessage" при offline access
 
@@ -45,8 +57,8 @@ export class UsersController {
         grant_type: 'authorization_code',
       }),
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
-      }
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
     });
 
     const data = await response.json();
@@ -62,7 +74,12 @@ export class UsersController {
   async addSessions(@Body() body: any) {
     const { newWorkout } = body;
     const response = await this.userService.addSessions(newWorkout);
-    if (!response) { throw new HttpException('Не удалось записать прошедшую тренировку', HttpStatus.BAD_REQUEST) }
+    if (!response) {
+      throw new HttpException(
+        'Не удалось записать прошедшую тренировку',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
     return response;
   }
 
@@ -79,4 +96,10 @@ export class UsersController {
 
 
 
+  @Patch('dateUpdate')
+  async changeDateUpdate(@Body() body: any) {
+    const { dateUpdate, id } = body;
+    const response = await this.userService.changeDateUpdate(dateUpdate, id);
+    return response;
+  }
 }
