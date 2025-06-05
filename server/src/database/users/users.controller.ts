@@ -1,8 +1,9 @@
-import { Controller, Get, Post, Patch, Body, HttpException, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, HttpException, HttpStatus, UnauthorizedException } from '@nestjs/common';
 import { UsersService } from './users.service';
 
 @Controller('users')
 export class UsersController {
+  jwtService: any;
   constructor(private readonly userService: UsersService) { }
 
   @Get()
@@ -63,6 +64,16 @@ export class UsersController {
     const response = await this.userService.addSessions(newWorkout);
     if (!response) { throw new HttpException('Не удалось записать прошедшую тренировку', HttpStatus.BAD_REQUEST) }
     return response;
+  }
+
+  @Post('login')
+  async login(@Body() body: any) {
+    const user = await this.userService.validateUser(body.username, body.password);
+    if (!user) throw new UnauthorizedException();
+
+    const payload = { sub: user.id, username: user.username };
+    const token = this.jwtService.sign(payload);
+    return { access_token: token };
   }
 
 

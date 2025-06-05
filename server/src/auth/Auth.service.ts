@@ -13,9 +13,7 @@ export class AuthService {
     // machineId: string,
     hangar: string
   ): Promise<any> {
-    const user = await this.usersService.loginUser(username, password, 
-      // machineId,
-      hangar
+    const user = await this.usersService.validateUser(username, password
     );
     if (user) {
       return user;

@@ -3,10 +3,48 @@ import { DatabaseService } from '../database.service';
 import { HttpException, HttpStatus } from '@nestjs/common';
 import axios from 'axios';
 import { google } from 'googleapis';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class UsersService {
     constructor(private readonly databaseService: DatabaseService) { }
+
+    async validateUser(username: string, password: string): Promise<any> {
+        try {
+            const user = await this.databaseService.query(
+                'SELECT * FROM users WHERE username = ?',
+                [username]
+            ) as any;
+            if (!user) {
+                return null; // пользователь не найден
+            }
+
+            const isPasswordValid = await bcrypt.compare(password, user.password);
+            if (!isPasswordValid) {
+                return null; // пароль неверный
+            }
+
+            const { password: _, ...userWithoutPassword } = user;
+            return userWithoutPassword;
+
+        } catch (error) {
+            console.error('Ошибка при проверке пользователя:', error.message);
+            throw new Error('Ошибка авторизации');
+        }
+    }
+
+    async findUserById(payload: any): Promise<any> {
+        try {
+            const user = await this.databaseService.query(
+                'SELECT * FROM users WHERE id = ?',
+                [payload]
+            ) as any;
+            return user;
+        } catch (err) {
+            console.error('Ошибка при проверке пользователя:', err.message);
+        }
+    }
+
 
     // Получение всех пользователей
     async getAllStatisticUser(): Promise<any[]> {

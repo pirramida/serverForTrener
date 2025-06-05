@@ -16,9 +16,7 @@ export class AuthController {
     // machineId: string,
     hangar: string
   }, @Res() res: Response,@Req() request: Request) {
-    const user = await this.usersService.loginUser(body.name, body.password, 
-      // body.machineId,
-      body.hangar
+    const user = await this.usersService.validateUser(body.name, body.password
     );
     console.log(user)
     if (user) {
