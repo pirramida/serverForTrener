@@ -14,7 +14,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 
 @Controller('clients_foto')
 export class ClientsFotoController {
-  constructor(private readonly clientsFotoService: ClientsFotoService) {}
+  constructor(private readonly clientsFotoService: ClientsFotoService) { }
 
   @Post('create-folder')
   async createFolder(
@@ -62,16 +62,42 @@ export class ClientsFotoController {
     return this.clientsFotoService.uploadPhoto(body, file);
   }
 
+  @Post('upload-primary-photo')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadPrimaryPhoto(
+    @UploadedFile() file: Express.Multer.File,
+    @Body() body: {
+      clientId: number;
+      userId: number;
+      type: string;
+      originalName: string;
+    },
+  ) {
+    return this.clientsFotoService.uploadPrimaryPhoto(body, file);
+  }
+
   @Delete('delete-photos')
   async deletePhoto(@Body() body: { date: string }) {
     console.log('fotoIdfotoId', body.date);
     return this.clientsFotoService.deletePhoto(body.date);
   }
 
+
   @Get('get-photos')
   async getPhotos(@Query('folderId') folderId: number) {
     return this.clientsFotoService.getPhotos(Number(folderId));
   }
 
-  
+  @Get('get-primary-photos')
+  async getPrimaryPhotos(
+    @Query('isPrimary') isPrimary: number,
+    @Query('clientId') clientId: number,
+    @Query('userId') userId: number,
+  ) {
+    console.log(isPrimary, clientId, userId);
+    return this.clientsFotoService.getPrimaryPhotos(isPrimary, clientId, userId);
+  }
+
+
+
 }

@@ -6,7 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class ClientsFotoService {
-  constructor(private readonly databaseService: DatabaseService) {}
+  constructor(private readonly databaseService: DatabaseService) { }
 
   private baseFolderPath = path.join(
     __dirname,
@@ -214,6 +214,73 @@ export class ClientsFotoService {
     return { success: true, fileName };
   }
 
+
+  async uploadPrimaryPhoto(
+    {
+      clientId,
+      userId,
+      type,
+      originalName,
+    }: {
+      clientId: number;
+      userId: number;
+      type: string;
+      originalName: string;
+    },
+    file: Express.Multer.File,
+  ) {
+    const fotoId = uuidv4();
+    const createdAt = new Date().toISOString();
+
+    const fotoFolder = path.join(
+      __dirname,
+      '..',
+      '..',
+      '..',
+      'uploads',
+      'users',
+      String(userId),
+      'clients',
+      String(clientId),
+      'primaryPhotos',
+    );
+
+    // ✅ Создаем папку, если не существует
+    await fs.promises.mkdir(fotoFolder, { recursive: true });
+
+    const safeOriginalName = originalName || file.originalname || 'default.jpg';
+    const ext = path.extname(safeOriginalName) || '.jpg';
+    const fileName = `${fotoId}${ext}`;
+    const filePath = path.join(fotoFolder, fileName);
+
+    // ✅ Сохраняем файл
+    await fs.promises.writeFile(filePath, file.buffer);
+
+    // ✅ Записываем в базу
+    await this.databaseService.query(
+      `INSERT INTO clients_fotos 
+     (clientsId, userId, folderId, url, type, is_primary, uploaded_at, comment)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        clientId,
+        userId,
+        null,
+        `/uploads/users/${userId}/clients/${clientId}/primaryPhotos/${fileName}`,
+        type,
+        1,
+        createdAt,
+        null,
+      ],
+    );
+
+    return {
+      success: true,
+      fileName,
+      url: `/uploads/users/${userId}/clients/${clientId}/primaryPhotos/${fileName}`,
+      uploadedAt: createdAt,
+    };
+  }
+
   async deletePhoto(date: string) {
     // Получим имя файла и путь
     console.log('fotoIdfotoId', date);
@@ -254,4 +321,18 @@ export class ClientsFotoService {
     console.log('rowsrowsrows', rows);
     return rows;
   }
+
+  async getPrimaryPhotos(isPrimary: number, clientId: number, userId: number) {
+    const rows = await this.databaseService.query(
+      `SELECT * 
+       FROM clients_fotos 
+       WHERE is_primary = ? AND clientsId = ? AND userId = ?`,
+      [isPrimary, clientId, userId],
+    );
+
+    console.log('rowsrowsrows', rows);
+    return rows;
+  }
+
+  
 }
