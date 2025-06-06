@@ -83,15 +83,15 @@ export class UsersController {
     return response;
   }
 
-  @Post('login')
-  async login(@Body() body: any) {
-    const user = await this.userService.validateUser(body.username, body.password);
-    if (!user) throw new UnauthorizedException();
+  // @Post('login')
+  // async login(@Body() body: any) {
+  //   const user = await this.userService.validateUser(body.username, body.password);
+  //   if (!user) throw new UnauthorizedException();
 
-    const payload = { sub: user.id, username: user.username };
-    const token = this.jwtService.sign(payload);
-    return { access_token: token };
-  }
+  //   const payload = { sub: user.id, username: user.username };
+  //   const token = this.jwtService.sign(payload);
+  //   return { access_token: token };
+  // }
 
 
 

@@ -7,22 +7,21 @@ import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly databaseService: DatabaseService) {}
+  constructor(private readonly databaseService: DatabaseService) { }
 
   async validateUser(username: string, password: string): Promise<any> {
     try {
-      const user = (await this.databaseService.query(
-        'SELECT * FROM users WHERE username = ?',
+      const [user] = await this.databaseService.query(
+        'SELECT * FROM users WHERE name = ?',
         [username],
-      )) as any;
-      if (!user) {
-        return null; // пользователь не найден
-      }
+      ) as any;
+      console.log('useruser', user);
+
+      if (!user) return null;
 
       const isPasswordValid = await bcrypt.compare(password, user.password);
-      if (!isPasswordValid) {
-        return null; // пароль неверный
-      }
+      console.log(isPasswordValid);
+      if (!isPasswordValid) return null;
 
       const { password: _, ...userWithoutPassword } = user;
       return userWithoutPassword;
@@ -32,17 +31,27 @@ export class UsersService {
     }
   }
 
-  async findUserById(payload: any): Promise<any> {
+
+  async findUserById(id: number): Promise<any> {
     try {
-      const user = (await this.databaseService.query(
+      const [user] = await this.databaseService.query(
         'SELECT * FROM users WHERE id = ?',
-        [payload],
-      )) as any;
-      return user;
+        [id],
+      );
+      return user || null;
     } catch (err) {
       console.error('Ошибка при проверке пользователя:', err.message);
+      return null;
     }
   }
+
+  async storeRefreshToken(userId: number, refreshToken: string): Promise<void> {
+    await this.databaseService.query(
+      'UPDATE users SET refresh_token = ? WHERE id = ?',
+      [refreshToken, userId]
+    );
+  }
+
 
   // Получение всех пользователей
   async getAllStatisticUser(): Promise<any[]> {

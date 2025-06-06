@@ -12,59 +12,59 @@ export class AuthController {
 
 
   @Post('login')
-  async login(@Body() body: { name: string; password: string, 
-    // machineId: string,
-    hangar: string
-  }, @Res() res: Response,@Req() request: Request) {
-    const user = await this.usersService.validateUser(body.name, body.password
-    );
-    console.log(user)
-    if (user) {
-      const { access_token, refresh_token  } = await this.authService.login(user);
-      res.cookie('accessToken', access_token, {
-        httpOnly: true,
-        secure: true,
-        sameSite: 'none',
-        maxAge: 15 * 60 * 1000,
-    });
-    res.cookie('refreshToken', refresh_token, {
-        httpOnly: true,
-        secure: true,
-        sameSite: 'none',
-        maxAge: 365 * 24 * 60 * 60 * 1000,
-    });
+async login(
+  @Body() body: { username: string; password: string; hangar: string },
+  @Res() res: Response,
+  @Req() request: Request
+) {
+  const user = await this.usersService.validateUser(body.username, body.password);
 
-    const oldUserNames = request.cookies['usernames'];
-    let userNames: string[] = [];
-    if (oldUserNames) {
-      try {
-        userNames = JSON.parse(oldUserNames);
-      } catch (e) {
-        userNames = [];
-      }
-    }
-
-    // Создаем Set из старых имен
-    const userNamesMap = new Set(userNames);
-
-    // Проверяем и добавляем новое имя, если его нет
-    if (!userNamesMap.has(body.name)) {
-      userNamesMap.add(body.name);
-    }
-
-    // Сохраняем Set как массив в JSON
-    res.cookie('usernames', JSON.stringify([...userNamesMap]), {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'none',
-      maxAge: 30 * 24 * 60 * 60 * 1000,
-    });
-  
-      // await this.usersService.storeRefreshToken(user[0].id, refresh_token);
-      return res.send({ message: 'Logged in successfully', access_token, refresh_token, user: user });
-    }
+  if (!user) {
     return res.status(401).send({ message: 'Invalid credentials' });
   }
+
+  const { access_token, refresh_token } = await this.authService.login(user);
+
+  res.cookie('accessToken', access_token, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'none',
+    maxAge: 15 * 60 * 1000, // 15 минут
+  });
+
+  res.cookie('refreshToken', refresh_token, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'none',
+    maxAge: 365 * 24 * 60 * 60 * 1000, // 1 год
+  });
+
+  // usernames cookie логика — остаётся как есть
+  const oldUserNames = request.cookies['usernames'];
+  let userNames: string[] = [];
+  if (oldUserNames) {
+    try {
+      userNames = JSON.parse(oldUserNames);
+    } catch (e) {
+      userNames = [];
+    }
+  }
+
+  const userNamesMap = new Set(userNames);
+  if (!userNamesMap.has(body.username)) {
+    userNamesMap.add(body.username);
+  }
+
+  res.cookie('usernames', JSON.stringify([...userNamesMap]), {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'none',
+    maxAge: 30 * 24 * 60 * 60 * 1000,
+  });
+
+  return res.send({ message: 'Logged in successfully', user });
+}
+
 
   @Post('refresh-token')
   async refreshToken(@Req() req: Request, @Res() res: Response) {
@@ -127,4 +127,5 @@ export class AuthController {
     res.clearCookie('token');
     return res.send({ message: 'Logged out successfully' });
   }
+  
 }

@@ -1,17 +1,15 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { UsersService } from 'src/database/users/users.service'; 
+import { UsersService } from 'src/database/users/users.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     private usersService: UsersService,
     private jwtService: JwtService,
-  ) {}
+  ) { }
 
-  async validateUser(username: string, password: string, 
-    // machineId: string,
-    hangar: string
+  async validateUser(username: string, password: string,
   ): Promise<any> {
     const user = await this.usersService.validateUser(username, password
     );
@@ -33,9 +31,17 @@ export class AuthService {
 
   async login(user: any) {
     const { id, name, roles } = user.user ?? user;
+
+    const access_token = this.jwtService.sign({ sub: id, roles }, { expiresIn: '15m' });
+    const refresh_token = this.jwtService.sign({ sub: id }, { expiresIn: '7d' });
+
+    // ✅ Сохраняем refresh токен в базе
+    await this.usersService.storeRefreshToken(id, refresh_token);
+
     return {
-      access_token: this.jwtService.sign({ sub: id, roles }, { expiresIn: '15m' }),
-      refresh_token: this.jwtService.sign({ sub: id }, { expiresIn: '7d' }),
+      access_token,
+      refresh_token,
     };
   }
+
 }

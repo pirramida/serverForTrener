@@ -214,11 +214,12 @@ export class ClientsFotoService {
     return { success: true, fileName };
   }
 
-  async deletePhoto(fotoId: number) {
+  async deletePhoto(date: string) {
     // Получим имя файла и путь
+    console.log('fotoIdfotoId', date);
     const rows = (await this.databaseService.query(
-      `SELECT clientsId, folderId, url FROM clients_fotos WHERE id = ?`,
-      [fotoId],
+      `SELECT clientsId, folderId, url FROM clients_fotos WHERE uploaded_at = ?`,
+      [date],
     )) as any[];
 
     const record = rows[0];
@@ -235,8 +236,8 @@ export class ClientsFotoService {
       fs.unlinkSync(filePath);
     }
 
-    await this.databaseService.run(`DELETE FROM clients_fotos WHERE id = ?`, [
-      fotoId,
+    await this.databaseService.run(`DELETE FROM clients_fotos WHERE uploaded_at = ?`, [
+      date,
     ]);
 
     return { success: true };
