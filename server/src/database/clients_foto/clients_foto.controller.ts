@@ -77,9 +77,9 @@ export class ClientsFotoController {
   }
 
   @Delete('delete-photos')
-  async deletePhoto(@Body() body: { date: string }) {
-    console.log('fotoIdfotoId', body.date);
-    return this.clientsFotoService.deletePhoto(body.date);
+  async deletePhoto(@Body() body: { id: string }) {
+    console.log('ididid', body.id);
+    return this.clientsFotoService.deletePhoto(body.id);
   }
 
 

@@ -25,7 +25,7 @@ async function bootstrap() {
 
   // ✅ CORS
   const allowedOrigins = [
-    'http://localhost:3002', // React dev
+    'http://localhost:3000', // React dev
     'https://your-prod-frontend.com', // uncomment for prod
   ];
 
