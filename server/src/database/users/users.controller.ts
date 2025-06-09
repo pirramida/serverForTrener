@@ -1,7 +1,9 @@
-import { Controller, Get, Post, Patch, Body, Query, HttpException, HttpStatus, UnauthorizedException } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Query, HttpException, HttpStatus, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { UsersService } from './users.service';
+import { JwtAuthGuard } from 'src/auth/Auth.guard';
 
 @Controller('users')
+@UseGuards(JwtAuthGuard)
 export class UsersController {
   jwtService: any;
   constructor(private readonly userService: UsersService) { }
@@ -24,7 +26,7 @@ export class UsersController {
     const { userdata, action } = body;
     return await this.userService.addGoogleAcc(userdata, action);
   }
-
+  @UseGuards(JwtAuthGuard)
   @Get('googleEvents')
   async getGoogleCalendarEvents() {
     const events = await this.userService.getGoogleCalendarEvents();

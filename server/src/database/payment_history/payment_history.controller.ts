@@ -1,5 +1,6 @@
-import { Controller, Get, Post, Body, Delete, Patch } from '@nestjs/common';
+import { Controller, Get, Post, Body, Delete, Patch, Query } from '@nestjs/common';
 import { PaymentService } from './payment_history.service';
+import { AnyARecord } from 'dns';
 
 @Controller('payment_history')
 export class PaymentController {
@@ -40,21 +41,4 @@ export class PaymentController {
         }
     }
 
-    //   @Post()
-    //   async addClient(@Body() body: { form: any}) {
-    //     await this.paymentService.addClient(body.form);
-    //     return { message: 'Клиент добавлен' };
-    //   }
-
-    //   @Delete()
-    //   async deleteClient(@Body() body: { phoneNumber: any }) {
-    //     await this.paymentService.deleteClient(body.phoneNumber);
-    //     return { message: 'Клиент удален!' };
-    //   }
-
-    //   @Patch()
-    //   async changeClient(@Body() body: { phoneNumber: any, form: any }) {
-    //     const newClientData = await this.paymentService.changeClient(body.phoneNumber, body.form);
-    //     return { data: newClientData, message: 'Данные пользователя обновлены!' }
-    //   }
 }

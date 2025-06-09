@@ -5,7 +5,7 @@ import { HttpException, HttpStatus } from '@nestjs/common';
 
 @Injectable()
 export class PaymentService {
-  constructor(private readonly databaseService: DatabaseService) {}
+  constructor(private readonly databaseService: DatabaseService) { }
 
   async getAllPaymentHistory(): Promise<any[]> {
     try {
@@ -15,6 +15,7 @@ export class PaymentService {
       return [];
     }
   }
+
 
   async changeSessionsClient(
     client: { name: string; phone: string },
@@ -169,7 +170,7 @@ export class PaymentService {
           console.log('[TX] Обновили sessions клиента');
 
           await this.databaseService.query(
-            `INSERT INTO session_history (name, phone, action, report, userID, clientId) VALUES (?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO session_history (name, phone, action, report, userID, clientId, trainingTime) VALUES (?, ?, ?, ?, ?, ?, ?)`,
             [
               client.name,
               Number(client.phone),
@@ -177,6 +178,7 @@ export class PaymentService {
               JSON.stringify(payload),
               1,
               clientId,
+              payload.sessionDate
             ],
           );
           console.log('[TX] Добавили в историю сессий');

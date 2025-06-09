@@ -12,15 +12,20 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([
         (req) => {
-          return req.cookies['accessToken'];
+          const token = req?.cookies?.['accessToken'];
+          if (!token) throw new UnauthorizedException('Access token not found');
+          return token;
         },
       ]),
+
       ignoreExpiration: false,
       secretOrKey: process.env.SECRET_KEY,
     });
   }
-  
+
   async validate(payload: any) {
+    console.log('JWT PAYLOAD:', payload);
+
     // console.log('Payload received in validate:', payload); // Добавьте это для отладки
     const user = await this.usersService.findUserById(payload.sub);
     if (!user) {
