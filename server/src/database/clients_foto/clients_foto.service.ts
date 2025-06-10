@@ -55,8 +55,6 @@ export class ClientsFotoService {
         throw new Error('Не удалось получить ID новой папки из базы данных');
       }
 
-      userId = 1;
-
       const folderPath = path.join(
         this.baseFolderPath,
         String(userId),
@@ -178,8 +176,6 @@ export class ClientsFotoService {
   try {
     const fotoId = uuidv4();
     const createdAt = new Date().toISOString();
-    userId = 1;
-
     const fotoFolder = path.join(
       __dirname,
       '..',

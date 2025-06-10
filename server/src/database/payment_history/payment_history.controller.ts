@@ -12,9 +12,9 @@ export class PaymentController {
     }
 
     @Post()
-    async postNewPaymentHistory(@Body() body: { fromData: any }) {
+    async postNewPaymentHistory(@Body() body: { fromData: any, userId: number }) {
         try {
-            const response = await this.paymentService.postNewPaymentHistory(body.fromData);
+            const response = await this.paymentService.postNewPaymentHistory(body.fromData, body.userId);
             return { message: 'Успешно!', data: response }
         } catch (error) {
             return { message: error };
@@ -27,9 +27,9 @@ export class PaymentController {
     }
 
     @Patch()
-    async changeSessionsClient(@Body() body: { client: any, payload: any }) {
+    async changeSessionsClient(@Body() body: { client: any, payload: any, userId: number }) {
         try {
-            const response = await this.paymentService.changeSessionsClient(body.client, body.payload);
+            const response = await this.paymentService.changeSessionsClient(body.client, body.payload, body.userId);
             if (response) {
                 return { status: true, data: response }
             }

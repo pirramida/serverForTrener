@@ -402,7 +402,21 @@ export class UsersService {
       return response;
     } catch (err) {
       console.error('Ошибка получения событий:', err.message);
-      return { todayClients: [], tomorrowClients: [] }; // Возвращаем пустые массивы в случае ошибки
+
+      const events = await this.databaseService.query(`SELECT events_todayChange FROM users WHERE id = ?`, [1]) as any;
+      const clients = (await this.databaseService.query(
+        'SELECT * FROM clients',
+      )) as any[];
+
+      // Возвращаем два массива: события на сегодня и завтра
+      const todayClients = mergeEventsWithClients(
+        JSON.parse(events[0].events_todayChange) || [],
+        clients,
+      );
+      return {
+        todayClients: todayClients,
+        tomorrowClients: []
+      };
     }
   }
 }

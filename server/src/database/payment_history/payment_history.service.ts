@@ -18,16 +18,17 @@ export class PaymentService {
 
 
   async changeSessionsClient(
-    client: { name: string; phone: string },
+    client: { name: string; phone: string; },
     payload,
+    userId
   ): Promise<any> {
     try {
       const response = await this.databaseService.runTransaction(async () => {
         console.log('[TX] Транзакция началась');
 
         const resetResult = (await this.databaseService.query(
-          `SELECT lastReset, dateUpdate FROM users WHERE name = ?`,
-          ['Юлия'],
+          `SELECT lastReset, dateUpdate FROM users WHERE id = ?`,
+          [userId],
         )) as any;
 
         const lastReset =
@@ -53,8 +54,8 @@ export class PaymentService {
           console.log('[TX] Обновляем статистику за прошлый месяц');
 
           const userData = (await this.databaseService.query(
-            `SELECT cashInMonth, sessionsInMonth, newClientsInMonth FROM users WHERE name = ?`,
-            ['Юлия'],
+            `SELECT cashInMonth, sessionsInMonth, newClientsInMonth FROM users WHERE id = ?`,
+            [userId],
           )) as any;
           console.log('[TX] userData:', userData);
 
@@ -83,14 +84,14 @@ export class PaymentService {
               newClientsInMonth,
               period,
               now.toISOString(),
-              1,
+              userId,
             ],
           );
           console.log('[TX] Сохранили статистику за период:', period);
 
           await this.databaseService.query(
-            `UPDATE users SET cashInMonth = 0, sessionsInMonth = 0, newClientsInMonth = 0, lastReset = ? WHERE name = ?`,
-            [now.toISOString(), 'Юлия'],
+            `UPDATE users SET cashInMonth = 0, sessionsInMonth = 0, newClientsInMonth = 0, lastReset = ? WHERE id = ?`,
+            [now.toISOString(), userId],
           );
           console.log('[TX] Обнулили поля статистики');
         }
@@ -176,7 +177,7 @@ export class PaymentService {
               Number(client.phone),
               'Списание тренировки',
               JSON.stringify(payload),
-              1,
+              userId,
               clientId,
               payload.sessionDate
             ],
@@ -190,8 +191,8 @@ export class PaymentService {
 
           const pricePerSession = amount / quantity;
           await this.databaseService.query(
-            `UPDATE users SET cashInMonth = COALESCE(cashInMonth, 0) + ?, sessionsInMonth = COALESCE(sessionsInMonth, 0) + 1, totalCash = COALESCE(totalCash, 0) + ?, totalSessions = COALESCE(totalSessions, 0) + 1 WHERE name = ?`,
-            [pricePerSession, pricePerSession, 'Юлия'],
+            `UPDATE users SET cashInMonth = COALESCE(cashInMonth, 0) + ?, sessionsInMonth = COALESCE(sessionsInMonth, 0) + 1, totalCash = COALESCE(totalCash, 0) + ?, totalSessions = COALESCE(totalSessions, 0) + 1 WHERE id = ?`,
+            [pricePerSession, pricePerSession, userId],
           );
           console.log('[TX] Обновили доход тренера');
         } else {
@@ -202,7 +203,7 @@ export class PaymentService {
               Number(client.phone),
               'Перенесенная тренировка',
               JSON.stringify(payload),
-              1,
+              userId,
               clientId,
             ],
           );
@@ -215,7 +216,7 @@ export class PaymentService {
 
         const results = (await this.databaseService.query(
           `SELECT events_todayChange FROM users WHERE id = ?`,
-          ['1'],
+          [userId],
         )) as any;
         const events_todayChange = JSON.parse(results[0].events_todayChange);
         const updatedEvents = events_todayChange.map((item: any) => {
@@ -230,7 +231,7 @@ export class PaymentService {
 
         await this.databaseService.query(
           `UPDATE users SET events_todayChange = ? WHERE id = ?`,
-          [JSON.stringify(updatedEvents), '1'],
+          [JSON.stringify(updatedEvents), userId],
         );
         console.log('[TX] Обновили события пользователя');
 
@@ -277,7 +278,7 @@ export class PaymentService {
     }
   }
 
-  async postNewPaymentHistory(fromData: any): Promise<any> {
+  async postNewPaymentHistory(fromData: any, userId: number): Promise<any> {
     try {
       const {
         id,
@@ -298,8 +299,8 @@ export class PaymentService {
       const query = `
         INSERT INTO payment_history (
           unique_id, date, client, amount, type, status, dateTo, customPaymentType,
-          isExpiryDateManuallySet, notes, phone, method, quantity, quantityLeft, clientId
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          isExpiryDateManuallySet, notes, phone, method, quantity, quantityLeft, clientId, userId
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
 
       let sessionCount;
@@ -333,6 +334,7 @@ export class PaymentService {
           sessionCount,
           sessionCount,
           clientId,
+          userId,
         ]);
 
         // 2. Получаем текущий sessionQueue клиента
@@ -420,24 +422,6 @@ function extractSessionCount(input: any): number {
   }
 
   return 0;
-}
-
-function mergeEventsWithClients(events, clients) {
-  return events
-    .map((event) => {
-      const client = clients.find(
-        (c) => c.name === event.summary || isSimilarName(event.summary, c.name),
-      );
-      if (client && event.marked !== true) {
-        return {
-          ...client,
-          start: event.start,
-          marked: event.marked ?? false,
-        };
-      }
-      return null;
-    })
-    .filter(Boolean); // убираем null
 }
 
 function isSimilarName(eventSummary: string, clientFullName: string): boolean {

@@ -12,7 +12,7 @@ async function bootstrap() {
     key: fs.readFileSync(join(__dirname, '..', 'ssl', 'key.pem')),
     cert: fs.readFileSync(join(__dirname, '..', 'ssl', 'cert.pem')),
   };
-  
+
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     httpsOptions,
   });
@@ -25,6 +25,7 @@ async function bootstrap() {
 
   // ✅ CORS
   const allowedOrigins = [
+    'http://localhost:3000', // React dev
     'http://localhost:3002', // React dev
     'https://your-prod-frontend.com', // uncomment for prod
   ];
