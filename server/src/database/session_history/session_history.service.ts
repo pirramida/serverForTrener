@@ -45,6 +45,20 @@ export class SessionService {
     }
   }
 
+  async customGetPaymentHistory(clientId: number): Promise<any[]> {
+    try {
+      console.log('clientId', clientId)
+      const response = await this.databaseService.query(
+        'SELECT * FROM session_history WHERE clientId = ?',
+        [clientId]
+      );
+      console.log('responseresponse', clientId)
 
-  
+      return response;
+    } catch (err) {
+      console.error('Ошибка при получении истории платежей:', err.message);
+      return [];
+    }
+  }
+
 }

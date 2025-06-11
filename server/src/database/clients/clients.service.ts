@@ -1,11 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../database.service';
 import { rejects } from 'assert';
 import { HttpException, HttpStatus } from '@nestjs/common';
 
 @Injectable()
 export class ClientsService {
-  constructor(private readonly databaseService: DatabaseService) { }
+  constructor(private readonly databaseService: DatabaseService) {}
 
   getAllClients(): Promise<any[]> {
     return new Promise((resolve, reject) => {
@@ -19,14 +19,93 @@ export class ClientsService {
     });
   }
 
+  async customGet(clientId: number, nameColumn?: string): Promise<any> {
+
+    const rows = await this.databaseService.query(
+      `SELECT ${nameColumn} FROM clients WHERE id = ?`,
+      [clientId],
+    );
+  
+    if (!rows.length) {
+      throw new NotFoundException('Клиент не найден');
+    }
+  
+    const value = rows[0][nameColumn];
+  
+    // Если поле — parametrs (или любое поле с JSON), можно попробовать распарсить:
+    if (typeof value === 'string') {
+      if (value.startsWith('{') || value.startsWith('[')) {
+        try {
+          return JSON.parse(value);
+        } catch {
+          return value; // Если парсинг не удался, вернуть как есть
+        }
+      }
+    
+      return value; // Просто строка
+    }
+    
+    return null; // или вернуть {}, [] — в зависимости от твоих ожиданий по умолчанию
+    
+  }
+  
+
   async deleteClient(phoneNumber: any): Promise<void> {
     try {
       const query = `DELETE FROM clients WHERE phone = ?`;
       await this.databaseService.query(query, [phoneNumber]);
       console.log(`Клиент с номером ${phoneNumber} успешно удален.`);
     } catch (error) {
-      console.error(`Ошибка при удалении клиента с номером ${phoneNumber}:`, error);
-      throw new HttpException('Не удалось удалить клиента', HttpStatus.INTERNAL_SERVER_ERROR);
+      console.error(
+        `Ошибка при удалении клиента с номером ${phoneNumber}:`,
+        error,
+      );
+      throw new HttpException(
+        'Не удалось удалить клиента',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  async changeParametrs(
+    corrections: any,
+    parameters: any,
+    primary: any,
+    clientId: number,
+  ): Promise<any> {
+    try {
+      // Связка параметров с primary значениями
+      const newPrimaryParametrs = parameters.map((param, index) => ({
+        param,
+        primary: primary[index],
+      }));
+
+      // Связка параметров с каждой коррекцией
+      const newCorrectionsParametrs = corrections.map((corrRow) =>
+        corrRow.map((value, index) => ({
+          param: parameters[index],
+          corr: value,
+        })),
+      );
+
+      // Финальный объект
+      const parametrs = {
+        primary: newPrimaryParametrs,
+        corrections: newCorrectionsParametrs,
+      };
+
+      await this.databaseService.query(
+        'UPDATE clients SET parametrs = ? WHERE id = ?',
+        [JSON.stringify(parametrs), clientId],
+      );
+
+      return true;
+    } catch (error) {
+      console.error(`Проблема с изменением параметров клиента`, error);
+      throw new HttpException(
+        'Проблема с изменением параметров клиента',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 
@@ -36,15 +115,15 @@ export class ClientsService {
 
       await this.databaseService.runTransaction(async () => {
         // Получаем клиента
-        const client = await this.databaseService.query(
+        const client = (await this.databaseService.query(
           'SELECT * FROM clients WHERE phone = ?',
-          [phoneNumber]
-        ) as any;
+          [phoneNumber],
+        )) as any;
 
         if (client.length === 0) {
           throw new HttpException(
             `Ошибка при изменении клиента с номером ${phoneNumber}: клиент не найден`,
-            HttpStatus.BAD_REQUEST
+            HttpStatus.BAD_REQUEST,
           );
         }
 
@@ -102,21 +181,27 @@ export class ClientsService {
           form.bodyFat,
           form.phone,
           form.dateOfBirth,
-          id
+          id,
         ];
 
         await this.databaseService.run(query, values);
 
         // Получаем обновлённого клиента
-        newDataClient = await this.databaseService.query('SELECT * FROM clients WHERE id = ?', [id]);
+        newDataClient = await this.databaseService.query(
+          'SELECT * FROM clients WHERE id = ?',
+          [id],
+        );
       });
 
       return newDataClient;
     } catch (error) {
-      console.error(`Ошибка при изменении клиента с номером ${phoneNumber}:`, error);
+      console.error(
+        `Ошибка при изменении клиента с номером ${phoneNumber}:`,
+        error,
+      );
       throw new HttpException(
         `Ошибка при изменении клиента с номером ${phoneNumber}: ${error.message || ''}`,
-        HttpStatus.INTERNAL_SERVER_ERROR
+        HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
@@ -146,8 +231,7 @@ export class ClientsService {
         form.waist,
         form.hips,
         form.bodyFat,
-        form.birthDate
-
+        form.birthDate,
       ];
 
       this.databaseService.getDB().run(query, values, (err) => {
@@ -160,5 +244,4 @@ export class ClientsService {
       });
     });
   }
-
 }

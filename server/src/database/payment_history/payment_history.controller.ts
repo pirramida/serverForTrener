@@ -1,5 +1,6 @@
-import { Controller, Get, Post, Body, Delete, Patch } from '@nestjs/common';
+import { Controller, Get, Post, Body, Delete, Patch, Query } from '@nestjs/common';
 import { PaymentService } from './payment_history.service';
+import { AnyARecord } from 'dns';
 
 @Controller('payment_history')
 export class PaymentController {
@@ -11,9 +12,9 @@ export class PaymentController {
     }
 
     @Post()
-    async postNewPaymentHistory(@Body() body: { fromData: any }) {
+    async postNewPaymentHistory(@Body() body: { fromData: any, userId: number }) {
         try {
-            const response = await this.paymentService.postNewPaymentHistory(body.fromData);
+            const response = await this.paymentService.postNewPaymentHistory(body.fromData, body.userId);
             return { message: 'Успешно!', data: response }
         } catch (error) {
             return { message: error };
@@ -26,9 +27,9 @@ export class PaymentController {
     }
 
     @Patch()
-    async changeSessionsClient(@Body() body: { client: any, payload: any }) {
+    async changeSessionsClient(@Body() body: { client: any, payload: any, userId: number }) {
         try {
-            const response = await this.paymentService.changeSessionsClient(body.client, body.payload);
+            const response = await this.paymentService.changeSessionsClient(body.client, body.payload, body.userId);
             if (response) {
                 return { status: true, data: response }
             }
@@ -40,21 +41,4 @@ export class PaymentController {
         }
     }
 
-    //   @Post()
-    //   async addClient(@Body() body: { form: any}) {
-    //     await this.paymentService.addClient(body.form);
-    //     return { message: 'Клиент добавлен' };
-    //   }
-
-    //   @Delete()
-    //   async deleteClient(@Body() body: { phoneNumber: any }) {
-    //     await this.paymentService.deleteClient(body.phoneNumber);
-    //     return { message: 'Клиент удален!' };
-    //   }
-
-    //   @Patch()
-    //   async changeClient(@Body() body: { phoneNumber: any, form: any }) {
-    //     const newClientData = await this.paymentService.changeClient(body.phoneNumber, body.form);
-    //     return { data: newClientData, message: 'Данные пользователя обновлены!' }
-    //   }
 }
