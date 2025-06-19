@@ -8,12 +8,16 @@ import {
   Query,
   UploadedFile,
   UseInterceptors,
+  UseGuards,
 } from '@nestjs/common';
 import { ClientsFotoService } from './clients_foto.service';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { JwtAuthGuard } from 'src/auth/Auth.guard';
 
 @Controller('clients_foto')
+@UseGuards(JwtAuthGuard)
 export class ClientsFotoController {
+  jwtService: any;
   constructor(private readonly clientsFotoService: ClientsFotoService) { }
 
   @Post('create-folder')

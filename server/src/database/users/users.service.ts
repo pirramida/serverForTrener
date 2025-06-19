@@ -100,6 +100,63 @@ export class UsersService {
     }
   }
 
+  async resetStatisticUser(user): Promise<boolean> {
+    try {
+      console.log('useruseruser', user)
+      await this.databaseService.runTransaction(async () => {
+        // Получаем текущие значения до сброса
+        const [userData] = await this.databaseService.query(
+          `SELECT cashInMonth, sessionsInMonth, newClientsInMonth FROM users WHERE id = ?`,
+          [user.id]
+        ) as any;
+
+        const { cashInMonth, sessionsInMonth, newClientsInMonth } = userData;
+
+        const now = new Date();
+        const previousMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const period = `${previousMonthDate.getFullYear()}-${String(previousMonthDate.getMonth() + 1).padStart(2, '0')}`;
+
+        // Сохраняем в архив
+        await this.databaseService.query(
+          `INSERT INTO statistic (
+          cashInMonth,
+          sessionsInMonth,
+          clientsInMonth,
+          period,
+          createdAt,
+          user_id
+        ) VALUES (?, ?, ?, ?, ?, ?)`,
+          [
+            cashInMonth,
+            sessionsInMonth,
+            newClientsInMonth,
+            period,
+            now.toISOString(),
+            user.id
+          ]
+        );
+
+        // Сбрасываем статистику у пользователя
+        await this.databaseService.query(
+          `UPDATE users
+         SET cashInMonth = 0,
+             sessionsInMonth = 0,
+             newClientsInMonth = 0,
+             lastReset = ?
+         WHERE id = ?`,
+          [now.toISOString(), user.id]
+        );
+      });
+
+      return true;
+    } catch (err) {
+      console.error('Ошибка при сбросе статистики:', err);
+      throw new Error('Не получилось обновить статистику пользователя');
+    }
+  }
+
+
+
   async addSessions(newWorkout): Promise<boolean> {
     try {
       const events = (await this.databaseService.query(

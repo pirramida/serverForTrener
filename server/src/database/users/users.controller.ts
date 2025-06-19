@@ -21,6 +21,14 @@ export class UsersController {
     return this.userService.customGet(userId, nameColoumn);
   }
 
+  @Patch('resetStatisticUser')
+  async resetStatisticUser(@Body() user: any) {
+    console.log('Получен пользователь:', user);
+    return await this.userService.resetStatisticUser(user);
+  }
+
+
+
   @Patch()
   async addGoogleAcc(@Body() body: any) {
     const { userdata, action } = body;

@@ -1,9 +1,12 @@
-import { Controller, Get, Post, Body, Delete, Patch, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Delete, Patch, Query, UseGuards} from '@nestjs/common';
 import { PaymentService } from './payment_history.service';
 import { AnyARecord } from 'dns';
+import { JwtAuthGuard } from 'src/auth/Auth.guard';
 
 @Controller('payment_history')
+@UseGuards(JwtAuthGuard)
 export class PaymentController {
+    jwtService: any;
     constructor(private readonly paymentService: PaymentService) { }
 
     @Get()

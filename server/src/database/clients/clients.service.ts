@@ -5,7 +5,7 @@ import { HttpException, HttpStatus } from '@nestjs/common';
 
 @Injectable()
 export class ClientsService {
-  constructor(private readonly databaseService: DatabaseService) {}
+  constructor(private readonly databaseService: DatabaseService) { }
 
   getAllClients(): Promise<any[]> {
     return new Promise((resolve, reject) => {
@@ -25,13 +25,13 @@ export class ClientsService {
       `SELECT ${nameColumn} FROM clients WHERE id = ?`,
       [clientId],
     );
-  
+
     if (!rows.length) {
       throw new NotFoundException('Клиент не найден');
     }
-  
+
     const value = rows[0][nameColumn];
-  
+
     // Если поле — parametrs (или любое поле с JSON), можно попробовать распарсить:
     if (typeof value === 'string') {
       if (value.startsWith('{') || value.startsWith('[')) {
@@ -41,14 +41,14 @@ export class ClientsService {
           return value; // Если парсинг не удался, вернуть как есть
         }
       }
-    
+
       return value; // Просто строка
     }
-    
+
     return null; // или вернуть {}, [] — в зависимости от твоих ожиданий по умолчанию
-    
+
   }
-  
+
 
   async deleteClient(phoneNumber: any): Promise<void> {
     try {
@@ -66,6 +66,34 @@ export class ClientsService {
       );
     }
   }
+
+  async clientStatistic(clientId: number): Promise<any> {
+    try {
+      const query = `
+      SELECT
+        clients.*,
+        payment_history.*,
+        session_history.*
+      FROM clients
+      LEFT JOIN payment_history ON clients.id = payment_history.clientId
+      LEFT JOIN session_history ON clients.id = session_history.clientId
+      WHERE clients.id = ?
+    `;
+
+      const result = await this.databaseService.query(query, [clientId]);
+
+      console.log('dsfdsfdsfdsfsd', result);
+      // return result;
+    } catch (error) {
+      console.log('Не получилось выполнить запрос для создания статистики ', error);
+      throw new HttpException(
+        'Не получилось выполнить запрос для создания статистики',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+
 
   async changeParametrs(
     corrections: any,

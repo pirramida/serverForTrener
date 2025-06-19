@@ -6,12 +6,16 @@ import {
   Delete,
   Patch,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import { ClientsService } from './clients.service';
+import { JwtAuthGuard } from 'src/auth/Auth.guard';
 
 @Controller('clients')
+@UseGuards(JwtAuthGuard)
 export class ClientsController {
-  constructor(private readonly clientsService: ClientsService) {}
+  jwtService: any;
+  constructor(private readonly clientsService: ClientsService) { }
 
   @Get()
   async getClients() {
@@ -63,5 +67,11 @@ export class ClientsController {
       body.clientId,
     );
     return newParametrs;
+  }
+
+  @Patch('/clientStatistic')
+  async clientStatistic(@Body() body: {clientId: number;},) {
+    const response = await this.clientsService.clientStatistic(body.clientId);
+    return response;
   }
 }
