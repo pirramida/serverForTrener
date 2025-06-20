@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Delete, Patch, Query, UseGuards} from '@nestjs/common';
+import { Controller, Get, Post, Body, Delete, Patch, Query, UseGuards } from '@nestjs/common';
 import { PaymentService } from './payment_history.service';
 import { AnyARecord } from 'dns';
 import { JwtAuthGuard } from 'src/auth/Auth.guard';

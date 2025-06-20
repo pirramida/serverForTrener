@@ -68,31 +68,57 @@ export class ClientsService {
   }
 
   async clientStatistic(clientId: number): Promise<any> {
-    try {
-      const query = `
-      SELECT
-        clients.*,
-        payment_history.*,
-        session_history.*
-      FROM clients
-      LEFT JOIN payment_history ON clients.id = payment_history.clientId
-      LEFT JOIN session_history ON clients.id = session_history.clientId
-      WHERE clients.id = ?
-    `;
+  try {
+    const clientQuery = `SELECT * FROM clients WHERE id = ?`;
+    const paymentsQuery = `SELECT * FROM payment_history WHERE clientId = ?`;
+    const sessionsQuery = `SELECT * FROM session_history WHERE clientId = ?`;
 
-      const result = await this.databaseService.query(query, [clientId]);
+    const [client] = await this.databaseService.query(clientQuery, [clientId]) as any;
+    const payments = await this.databaseService.query(paymentsQuery, [clientId]) as any;
+    const sessions = await this.databaseService.query(sessionsQuery, [clientId]) as any;
 
-      console.log('dsfdsfdsfdsfsd', result);
-      // return result;
-    } catch (error) {
-      console.log('Не получилось выполнить запрос для создания статистики ', error);
-      throw new HttpException(
-        'Не получилось выполнить запрос для создания статистики',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
+    // 1. Параметры тела
+    const parsedParams = client.parametrs ? JSON.parse(client.parametrs) : { primary: [], corrections: [] };
+
+    // 2. Готовим платежи для графиков
+    const formattedPayments = payments.map(p => ({
+      date: p.date,
+      type: p.type,
+      quantity: p.quantity,
+      quantityLeft: p.quantityLeft,
+      status: p.status,
+      amount: p.amount,
+      releaseDate: p.releaseDate,
+    }));
+
+    // 3. Готовим сессии (в том числе разбираем report из строки)
+    const formattedSessions = sessions.map(s => {
+      const report = s.report ? JSON.parse(s.report) : {};
+      return {
+        date: s.date,
+        trainingTime: s.trainingTime,
+        type: report.type || '',
+        intensity: report.intensity || '',
+        rating: report.rating || 0,
+        conditionBefore: report.conditionBefore || '',
+        conditionAfter: report.conditionAfter || '',
+        comment: report.comment || '',
+      };
+    });
+
+    return {
+      parameters: parsedParams,         // параметры тела
+      payments: formattedPayments,      // платежи
+      sessions: formattedSessions,      // тренировки
+    };
+  } catch (error) {
+    console.log('Не получилось выполнить запрос для создания статистики ', error);
+    throw new HttpException(
+      'Не получилось выполнить запрос для создания статистики',
+      HttpStatus.INTERNAL_SERVER_ERROR,
+    );
   }
-
+}
 
 
   async changeParametrs(

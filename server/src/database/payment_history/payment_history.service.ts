@@ -96,7 +96,6 @@ export class PaymentService {
         //   console.log('[TX] Обнулили поля статистики');
         // }
 
-
         const clientId = client.id;
         console.log('[TX] clientId:', clientId);
 
@@ -148,10 +147,18 @@ export class PaymentService {
           console.log('[TX] Списание тренировки. Осталось:', updatedQuantityLeft);
 
           if (updatedQuantityLeft === 0 && status !== 'Не активен') {
+
             await this.databaseService.query(
               `UPDATE payment_history SET quantityLeft = ?, status = 'Не активен' WHERE unique_id = ?`,
               [updatedQuantityLeft, firstPackageId]
             ) as any;
+
+            // 👇 Устанавливаем дату завершения
+            await this.databaseService.query(
+              `UPDATE payment_history SET releaseDate = ? WHERE unique_id = ?`,
+              [payload.sessionDate, firstPackageId]
+            );
+            console.log('[TX] Установили releaseDate пакета:', payload.sessionDate);
 
             const updatedQueue = currentQueue.slice(1);
             await this.databaseService.query(
@@ -169,7 +176,7 @@ export class PaymentService {
           }
 
           await this.databaseService.query(
-            `UPDATE clients SET sessions = CASE WHEN sessions > 0 THEN sessions - 1 ELSE 0 END WHERE id = ?`,
+            `UPDATE clients SET sessions = sessions + 1 WHERE id = ?`,
             [clientId]
           ) as any;
           console.log('[TX] Обновили sessions клиента');
