@@ -70,8 +70,31 @@ export class ClientsController {
   }
 
   @Patch('/clientStatistic')
-  async clientStatistic(@Body() body: {clientId: number;},) {
+  async clientStatistic(@Body() body: { clientId: number; },) {
     const response = await this.clientsService.clientStatistic(body.clientId);
     return response;
+  }
+
+  @Patch('stepsAndCalories')
+  async saveStepAndCalories(@Body() body: any) {
+    const { userId, clientId, date, steps, calories } = body;
+
+    return this.clientsService.saveStepAndCalories({
+      userId,
+      clientId,
+      date,
+      steps,
+      calories,
+    });
+  }
+
+  @Patch('stepsAndCalories')
+  async patchStepsAndCalories(@Body() body: any) {
+    return await this.clientsService.saveStepAndCalories(body);
+  }
+
+  @Get('stepsAndCalories')
+  async getStepsAndCalories(@Query('userId') userId: number, @Query('clientId') clientId: number) {
+    return await this.clientsService.getStepAndCalories(userId, clientId);
   }
 }

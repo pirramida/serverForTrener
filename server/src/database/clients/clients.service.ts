@@ -68,57 +68,57 @@ export class ClientsService {
   }
 
   async clientStatistic(clientId: number): Promise<any> {
-  try {
-    const clientQuery = `SELECT * FROM clients WHERE id = ?`;
-    const paymentsQuery = `SELECT * FROM payment_history WHERE clientId = ?`;
-    const sessionsQuery = `SELECT * FROM session_history WHERE clientId = ?`;
+    try {
+      const clientQuery = `SELECT * FROM clients WHERE id = ?`;
+      const paymentsQuery = `SELECT * FROM payment_history WHERE clientId = ?`;
+      const sessionsQuery = `SELECT * FROM session_history WHERE clientId = ?`;
 
-    const [client] = await this.databaseService.query(clientQuery, [clientId]) as any;
-    const payments = await this.databaseService.query(paymentsQuery, [clientId]) as any;
-    const sessions = await this.databaseService.query(sessionsQuery, [clientId]) as any;
+      const [client] = await this.databaseService.query(clientQuery, [clientId]) as any;
+      const payments = await this.databaseService.query(paymentsQuery, [clientId]) as any;
+      const sessions = await this.databaseService.query(sessionsQuery, [clientId]) as any;
 
-    // 1. Параметры тела
-    const parsedParams = client.parametrs ? JSON.parse(client.parametrs) : { primary: [], corrections: [] };
+      // 1. Параметры тела
+      const parsedParams = client.parametrs ? JSON.parse(client.parametrs) : { primary: [], corrections: [] };
 
-    // 2. Готовим платежи для графиков
-    const formattedPayments = payments.map(p => ({
-      date: p.date,
-      type: p.type,
-      quantity: p.quantity,
-      quantityLeft: p.quantityLeft,
-      status: p.status,
-      amount: p.amount,
-      releaseDate: p.releaseDate,
-    }));
+      // 2. Готовим платежи для графиков
+      const formattedPayments = payments.map(p => ({
+        date: p.date,
+        type: p.type,
+        quantity: p.quantity,
+        quantityLeft: p.quantityLeft,
+        status: p.status,
+        amount: p.amount,
+        releaseDate: p.releaseDate,
+      }));
 
-    // 3. Готовим сессии (в том числе разбираем report из строки)
-    const formattedSessions = sessions.map(s => {
-      const report = s.report ? JSON.parse(s.report) : {};
+      // 3. Готовим сессии (в том числе разбираем report из строки)
+      const formattedSessions = sessions.map(s => {
+        const report = s.report ? JSON.parse(s.report) : {};
+        return {
+          date: s.date,
+          trainingTime: s.trainingTime,
+          type: report.type || '',
+          intensity: report.intensity || '',
+          rating: report.rating || 0,
+          conditionBefore: report.conditionBefore || '',
+          conditionAfter: report.conditionAfter || '',
+          comment: report.comment || '',
+        };
+      });
+
       return {
-        date: s.date,
-        trainingTime: s.trainingTime,
-        type: report.type || '',
-        intensity: report.intensity || '',
-        rating: report.rating || 0,
-        conditionBefore: report.conditionBefore || '',
-        conditionAfter: report.conditionAfter || '',
-        comment: report.comment || '',
+        parameters: parsedParams,         // параметры тела
+        payments: formattedPayments,      // платежи
+        sessions: formattedSessions,      // тренировки
       };
-    });
-
-    return {
-      parameters: parsedParams,         // параметры тела
-      payments: formattedPayments,      // платежи
-      sessions: formattedSessions,      // тренировки
-    };
-  } catch (error) {
-    console.log('Не получилось выполнить запрос для создания статистики ', error);
-    throw new HttpException(
-      'Не получилось выполнить запрос для создания статистики',
-      HttpStatus.INTERNAL_SERVER_ERROR,
-    );
+    } catch (error) {
+      console.log('Не получилось выполнить запрос для создания статистики ', error);
+      throw new HttpException(
+        'Не получилось выполнить запрос для создания статистики',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
-}
 
 
   async changeParametrs(
@@ -298,4 +298,54 @@ export class ClientsService {
       });
     });
   }
+
+  // services/user.service.ts
+  async getStepAndCalories(userId: number, clientId: number) {
+    try {
+      const res = await this.databaseService.query(
+        'SELECT stepsAndCalories FROM clients WHERE id = ?',
+        [clientId]
+      ) as any;
+
+      if (!res || !res[0]?.stepsAndCalories) return [];
+
+      return JSON.parse(res[0].stepsAndCalories);
+    } catch (error) {
+      throw new Error("Ошибка при загрузке данных о шагах и калориях");
+    }
+  }
+
+  async saveStepAndCalories(data: {
+    userId: number;
+    clientId: number;
+    date: string;
+    steps?: number;
+    calories?: number;
+  }) {
+    try {
+      const { userId, clientId, date, steps, calories } = data;
+
+      const res = await this.databaseService.query(
+        'SELECT stepsAndCalories FROM clients WHERE id = ?',
+        [clientId]
+      ) as any;
+
+      const current = res?.[0]?.stepsAndCalories
+        ? JSON.parse(res[0].stepsAndCalories)
+        : [];
+
+      // Обновляем или добавляем запись
+      const updated = [...current.filter(e => e.date !== date), { date, steps, calories }];
+
+      await this.databaseService.query(
+        'UPDATE clients SET stepsAndCalories = ? WHERE id = ?',
+        [JSON.stringify(updated), clientId]
+      );
+
+      return { success: true, updated };
+    } catch (error) {
+      throw new Error("Ошибка при сохранении шагов и калорий");
+    }
+  }
+
 }

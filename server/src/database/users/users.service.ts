@@ -15,7 +15,6 @@ export class UsersService {
         'SELECT * FROM users WHERE name = ?',
         [username],
       ) as any;
-      console.log('useruser', user);
 
       if (!user) return null;
 
@@ -102,15 +101,14 @@ export class UsersService {
 
   async resetStatisticUser(user): Promise<boolean> {
     try {
-      console.log('useruseruser', user)
       await this.databaseService.runTransaction(async () => {
         // Получаем текущие значения до сброса
         const [userData] = await this.databaseService.query(
-          `SELECT cashInMonth, sessionsInMonth, newClientsInMonth FROM users WHERE id = ?`,
+          `SELECT cashInMonth, sessionsInMonth, newClientsInMonth, additionalPymentsInMonth FROM users WHERE id = ?`,
           [user.id]
         ) as any;
 
-        const { cashInMonth, sessionsInMonth, newClientsInMonth } = userData;
+        const { cashInMonth, sessionsInMonth, newClientsInMonth, additionalPymentsInMonth } = userData;
 
         const now = new Date();
         const previousMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
@@ -124,14 +122,16 @@ export class UsersService {
           clientsInMonth,
           period,
           createdAt,
+          additionalPymentsInMonth,
           user_id
-        ) VALUES (?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
           [
             cashInMonth,
             sessionsInMonth,
             newClientsInMonth,
             period,
             now.toISOString(),
+            additionalPymentsInMonth,
             user.id
           ]
         );
@@ -142,6 +142,7 @@ export class UsersService {
          SET cashInMonth = 0,
              sessionsInMonth = 0,
              newClientsInMonth = 0,
+             additionalPymentsInMonth = 0,
              lastReset = ?
          WHERE id = ?`,
           [now.toISOString(), user.id]
@@ -476,6 +477,9 @@ export class UsersService {
       };
     }
   }
+
+
+
 }
 
 function mergeEventsWithClients(events, clients) {
@@ -526,4 +530,6 @@ function isSimilarName(eventSummary: string, clientFullName: string): boolean {
       (word === clientInitial && otherWord === clientSurname)
     );
   });
+
+
 }
