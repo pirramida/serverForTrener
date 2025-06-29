@@ -15,7 +15,7 @@ import { JwtAuthGuard } from 'src/auth/Auth.guard';
 @UseGuards(JwtAuthGuard)
 export class ClientsController {
   jwtService: any;
-  constructor(private readonly clientsService: ClientsService) { }
+  constructor(private readonly clientsService: ClientsService) {}
 
   @Get()
   async getClients() {
@@ -51,6 +51,12 @@ export class ClientsController {
     return { data: newClientData, message: 'Данные пользователя обновлены!' };
   }
 
+  @Patch('saveClientBlock')
+  async saveClientBlock(@Body() payload: any) {
+    console.log(payload);
+    return await this.clientsService.saveClientBlock(payload);
+  }
+
   @Patch('/changeParametrs')
   async changeParametrs(
     @Body()
@@ -70,7 +76,7 @@ export class ClientsController {
   }
 
   @Patch('/clientStatistic')
-  async clientStatistic(@Body() body: { clientId: number; },) {
+  async clientStatistic(@Body() body: { clientId: number }) {
     const response = await this.clientsService.clientStatistic(body.clientId);
     return response;
   }
@@ -94,7 +100,10 @@ export class ClientsController {
   }
 
   @Get('stepsAndCalories')
-  async getStepsAndCalories(@Query('userId') userId: number, @Query('clientId') clientId: number) {
+  async getStepsAndCalories(
+    @Query('userId') userId: number,
+    @Query('clientId') clientId: number,
+  ) {
     return await this.clientsService.getStepAndCalories(userId, clientId);
   }
 }

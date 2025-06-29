@@ -7,14 +7,14 @@ import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly databaseService: DatabaseService) { }
+  constructor(private readonly databaseService: DatabaseService) {}
 
   async validateUser(username: string, password: string): Promise<any> {
     try {
-      const [user] = await this.databaseService.query(
+      const [user] = (await this.databaseService.query(
         'SELECT * FROM users WHERE name = ?',
         [username],
-      ) as any;
+      )) as any;
 
       if (!user) return null;
 
@@ -29,7 +29,6 @@ export class UsersService {
       throw new Error('Ошибка авторизации');
     }
   }
-
 
   async findUserById(id: number): Promise<any> {
     try {
@@ -47,10 +46,9 @@ export class UsersService {
   async storeRefreshToken(userId: number, refreshToken: string): Promise<void> {
     await this.databaseService.query(
       'UPDATE users SET refresh_token = ? WHERE id = ?',
-      [refreshToken, userId]
+      [refreshToken, userId],
     );
   }
-
 
   // Получение всех пользователей
   async getAllStatisticUser(): Promise<any[]> {
@@ -103,15 +101,24 @@ export class UsersService {
     try {
       await this.databaseService.runTransaction(async () => {
         // Получаем текущие значения до сброса
-        const [userData] = await this.databaseService.query(
+        const [userData] = (await this.databaseService.query(
           `SELECT cashInMonth, sessionsInMonth, newClientsInMonth, additionalPymentsInMonth FROM users WHERE id = ?`,
-          [user.id]
-        ) as any;
+          [user.id],
+        )) as any;
 
-        const { cashInMonth, sessionsInMonth, newClientsInMonth, additionalPymentsInMonth } = userData;
+        const {
+          cashInMonth,
+          sessionsInMonth,
+          newClientsInMonth,
+          additionalPymentsInMonth,
+        } = userData;
 
         const now = new Date();
-        const previousMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const previousMonthDate = new Date(
+          now.getFullYear(),
+          now.getMonth() - 1,
+          1,
+        );
         const period = `${previousMonthDate.getFullYear()}-${String(previousMonthDate.getMonth() + 1).padStart(2, '0')}`;
 
         // Сохраняем в архив
@@ -132,8 +139,8 @@ export class UsersService {
             period,
             now.toISOString(),
             additionalPymentsInMonth,
-            user.id
-          ]
+            user.id,
+          ],
         );
 
         // Сбрасываем статистику у пользователя
@@ -145,7 +152,7 @@ export class UsersService {
              additionalPymentsInMonth = 0,
              lastReset = ?
          WHERE id = ?`,
-          [now.toISOString(), user.id]
+          [now.toISOString(), user.id],
         );
       });
 
@@ -155,8 +162,6 @@ export class UsersService {
       throw new Error('Не получилось обновить статистику пользователя');
     }
   }
-
-
 
   async addSessions(newWorkout): Promise<boolean> {
     try {
@@ -177,6 +182,8 @@ export class UsersService {
       return false;
     }
   }
+
+ 
 
   async changeDateUpdate(dateUpdate, id): Promise<any> {
     try {
@@ -461,7 +468,10 @@ export class UsersService {
     } catch (err) {
       console.error('Ошибка получения событий:', err.message);
 
-      const events = await this.databaseService.query(`SELECT events_todayChange FROM users WHERE id = ?`, [1]) as any;
+      const events = (await this.databaseService.query(
+        `SELECT events_todayChange FROM users WHERE id = ?`,
+        [1],
+      )) as any;
       const clients = (await this.databaseService.query(
         'SELECT * FROM clients',
       )) as any[];
@@ -473,13 +483,10 @@ export class UsersService {
       );
       return {
         todayClients: todayClients,
-        tomorrowClients: []
+        tomorrowClients: [],
       };
     }
   }
-
-
-
 }
 
 function mergeEventsWithClients(events, clients) {
@@ -530,6 +537,4 @@ function isSimilarName(eventSummary: string, clientFullName: string): boolean {
       (word === clientInitial && otherWord === clientSurname)
     );
   });
-
-
 }

@@ -1,4 +1,15 @@
-import { Controller, Get, Post, Patch, Body, Query, HttpException, HttpStatus, UnauthorizedException, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Body,
+  Query,
+  HttpException,
+  HttpStatus,
+  UnauthorizedException,
+  UseGuards,
+} from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from 'src/auth/Auth.guard';
 
@@ -6,7 +17,7 @@ import { JwtAuthGuard } from 'src/auth/Auth.guard';
 @UseGuards(JwtAuthGuard)
 export class UsersController {
   jwtService: any;
-  constructor(private readonly userService: UsersService) { }
+  constructor(private readonly userService: UsersService) {}
 
   @Get()
   async getAllStatisticUser() {
@@ -26,8 +37,6 @@ export class UsersController {
     console.log('Получен пользователь:', user);
     return await this.userService.resetStatisticUser(user);
   }
-
-
 
   @Patch()
   async addGoogleAcc(@Body() body: any) {
@@ -103,15 +112,10 @@ export class UsersController {
   //   return { access_token: token };
   // }
 
-
-
-
   @Patch('dateUpdate')
   async changeDateUpdate(@Body() body: any) {
     const { dateUpdate, id } = body;
     const response = await this.userService.changeDateUpdate(dateUpdate, id);
     return response;
   }
-
-
 }

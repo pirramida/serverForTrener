@@ -86,7 +86,6 @@ export class ClientsFotoController {
     return this.clientsFotoService.deletePhoto(body.id);
   }
 
-
   @Get('get-photos')
   async getPhotos(@Query('folderId') folderId: number) {
     return this.clientsFotoService.getPhotos(Number(folderId));
