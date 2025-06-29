@@ -6,11 +6,15 @@ import {
   Delete,
   Patch,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import { ClientsService } from './clients.service';
+import { JwtAuthGuard } from 'src/auth/Auth.guard';
 
 @Controller('clients')
+@UseGuards(JwtAuthGuard)
 export class ClientsController {
+  jwtService: any;
   constructor(private readonly clientsService: ClientsService) {}
 
   @Get()
@@ -47,6 +51,12 @@ export class ClientsController {
     return { data: newClientData, message: 'Данные пользователя обновлены!' };
   }
 
+  @Patch('saveClientBlock')
+  async saveClientBlock(@Body() payload: any) {
+    console.log(payload);
+    return await this.clientsService.saveClientBlock(payload);
+  }
+
   @Patch('/changeParametrs')
   async changeParametrs(
     @Body()
@@ -63,5 +73,37 @@ export class ClientsController {
       body.clientId,
     );
     return newParametrs;
+  }
+
+  @Patch('/clientStatistic')
+  async clientStatistic(@Body() body: { clientId: number }) {
+    const response = await this.clientsService.clientStatistic(body.clientId);
+    return response;
+  }
+
+  @Patch('stepsAndCalories')
+  async saveStepAndCalories(@Body() body: any) {
+    const { userId, clientId, date, steps, calories } = body;
+
+    return this.clientsService.saveStepAndCalories({
+      userId,
+      clientId,
+      date,
+      steps,
+      calories,
+    });
+  }
+
+  @Patch('stepsAndCalories')
+  async patchStepsAndCalories(@Body() body: any) {
+    return await this.clientsService.saveStepAndCalories(body);
+  }
+
+  @Get('stepsAndCalories')
+  async getStepsAndCalories(
+    @Query('userId') userId: number,
+    @Query('clientId') clientId: number,
+  ) {
+    return await this.clientsService.getStepAndCalories(userId, clientId);
   }
 }

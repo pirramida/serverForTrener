@@ -1,4 +1,15 @@
-import { Controller, Get, Post, Patch, Body, Query, HttpException, HttpStatus, UnauthorizedException, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Body,
+  Query,
+  HttpException,
+  HttpStatus,
+  UnauthorizedException,
+  UseGuards,
+} from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from 'src/auth/Auth.guard';
 
@@ -6,7 +17,7 @@ import { JwtAuthGuard } from 'src/auth/Auth.guard';
 @UseGuards(JwtAuthGuard)
 export class UsersController {
   jwtService: any;
-  constructor(private readonly userService: UsersService) { }
+  constructor(private readonly userService: UsersService) {}
 
   @Get()
   async getAllStatisticUser() {
@@ -19,6 +30,12 @@ export class UsersController {
     @Query('nameColoumn') nameColoumn?: string,
   ): Promise<any> {
     return this.userService.customGet(userId, nameColoumn);
+  }
+
+  @Patch('resetStatisticUser')
+  async resetStatisticUser(@Body() user: any) {
+    console.log('Получен пользователь:', user);
+    return await this.userService.resetStatisticUser(user);
   }
 
   @Patch()
@@ -94,9 +111,6 @@ export class UsersController {
   //   const token = this.jwtService.sign(payload);
   //   return { access_token: token };
   // }
-
-
-
 
   @Patch('dateUpdate')
   async changeDateUpdate(@Body() body: any) {

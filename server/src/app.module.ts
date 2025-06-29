@@ -9,9 +9,10 @@ import { SessionModule } from './database/session_history/session_history.module
 import { ClientsFotoModule } from './database/clients_foto/clients._foto.module';
 import { AuthModule } from './auth/Auth.module';
 import { JwtService } from '@nestjs/jwt';
-
+import { additionalPaymentsModule } from './database/additional_payments/additional_payments.module';
+import { FitnessTestModule } from './database/fitness_test/fitness_test.module';
 @Module({
-  imports: [DatabaseModule, ClientsModule, PaymentModule, UsersModule, SessionModule, ClientsFotoModule, AuthModule],
+  imports: [FitnessTestModule, DatabaseModule, ClientsModule, PaymentModule, UsersModule, SessionModule, ClientsFotoModule, AuthModule, additionalPaymentsModule ],
   controllers: [AppController],
   providers: [AppService, JwtService],
 })

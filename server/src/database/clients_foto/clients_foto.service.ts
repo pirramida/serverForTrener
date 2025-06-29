@@ -6,7 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class ClientsFotoService {
-  constructor(private readonly databaseService: DatabaseService) {}
+  constructor(private readonly databaseService: DatabaseService) { }
 
   private baseFolderPath = path.join(
     __dirname,
@@ -157,89 +157,89 @@ export class ClientsFotoService {
     }
   }
 
- async uploadPhoto(
-  {
-    clientId,
-    userId,
-    folderId,
-    originalName,
-    type,
-  }: {
-    clientId: number;
-    userId: number;
-    folderId: number;
-    originalName: string;
-    type: string;
-  },
-  file: Express.Multer.File,
-) {
-  try {
-    const fotoId = uuidv4();
-    const createdAt = new Date().toISOString();
-    const fotoFolder = path.join(
-      __dirname,
-      '..',
-      '..',
-      '..',
-      'uploads',
-      'users',
-      String(userId),
-      'clients',
-      String(clientId),
-      'folders',
-      String(folderId),
-    );
-
-    const safeOriginalName = originalName || file.originalname || 'default.jpg';
-    const ext = path.extname(safeOriginalName) || '.jpg';
-    const fileName = `${fotoId}${ext}`;
-    const filePath = path.join(fotoFolder, fileName);
-
-    // Сначала сохраняем файл на диск вне транзакции
-    await fs.promises.writeFile(filePath, file.buffer);
-
-    // Далее начинается транзакция
-    const response = await this.databaseService.runTransaction(async () => {
-      await this.databaseService.query(
-        `INSERT INTO clients_fotos 
-         (clientsId, userId, folderId, url, type, is_primary, uploaded_at, comment)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          clientId,
-          userId,
-          folderId,
-          `/uploads/users/${userId}/clients/${clientId}/folders/${folderId}/${fileName}`,
-          type,
-          false,
-          createdAt,
-          null,
-        ],
+  async uploadPhoto(
+    {
+      clientId,
+      userId,
+      folderId,
+      originalName,
+      type,
+    }: {
+      clientId: number;
+      userId: number;
+      folderId: number;
+      originalName: string;
+      type: string;
+    },
+    file: Express.Multer.File,
+  ) {
+    try {
+      const fotoId = uuidv4();
+      const createdAt = new Date().toISOString();
+      const fotoFolder = path.join(
+        __dirname,
+        '..',
+        '..',
+        '..',
+        'uploads',
+        'users',
+        String(userId),
+        'clients',
+        String(clientId),
+        'folders',
+        String(folderId),
       );
 
-      const querySelect = `SELECT counterPhoto FROM folders WHERE id = ?`;
-      const rows = (await this.databaseService.query(querySelect, [folderId])) as any[];
+      const safeOriginalName = originalName || file.originalname || 'default.jpg';
+      const ext = path.extname(safeOriginalName) || '.jpg';
+      const fileName = `${fotoId}${ext}`;
+      const filePath = path.join(fotoFolder, fileName);
 
-      const currentCounter = rows?.[0]?.counterPhoto || 0;
-      const newCounterPhoto = Number(currentCounter) + 1;
+      // Сначала сохраняем файл на диск вне транзакции
+      await fs.promises.writeFile(filePath, file.buffer);
 
-      const queryUpdate = `UPDATE folders SET counterPhoto = ? WHERE id = ?`;
-      await this.databaseService.query(queryUpdate, [newCounterPhoto, folderId]);
+      // Далее начинается транзакция
+      const response = await this.databaseService.runTransaction(async () => {
+        await this.databaseService.query(
+          `INSERT INTO clients_fotos 
+         (clientsId, userId, folderId, url, type, is_primary, uploaded_at, comment)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            clientId,
+            userId,
+            folderId,
+            `/uploads/users/${userId}/clients/${clientId}/folders/${folderId}/${fileName}`,
+            type,
+            false,
+            createdAt,
+            null,
+          ],
+        );
 
+        const querySelect = `SELECT counterPhoto FROM folders WHERE id = ?`;
+        const rows = (await this.databaseService.query(querySelect, [folderId])) as any[];
+
+        const currentCounter = rows?.[0]?.counterPhoto || 0;
+        const newCounterPhoto = Number(currentCounter) + 1;
+
+        const queryUpdate = `UPDATE folders SET counterPhoto = ? WHERE id = ?`;
+        await this.databaseService.query(queryUpdate, [newCounterPhoto, folderId]);
+
+        return {
+          success: true,
+          url: `/uploads/users/${userId}/clients/${clientId}/folders/${folderId}/${fileName}`,
+        };
+      });
+
+      return response;
+    } catch (error) {
+      console.error('Ошибка при загрузке фото:', error);
       return {
-        success: true,
-        url: `/uploads/users/${userId}/clients/${clientId}/folders/${folderId}/${fileName}`,
+        success: false,
+        error: error.message || 'Ошибка при загрузке фото',
       };
-    });
-
-    return response;
-  } catch (error) {
-    console.error('Ошибка при загрузке фото:', error);
-    return {
-      success: false,
-      error: error.message || 'Ошибка при загрузке фото',
-    };
+    }
   }
-}
 
 
   async uploadPrimaryPhoto(
@@ -372,8 +372,6 @@ export class ClientsFotoService {
        WHERE folderId = ?`,
       [folderId],
     );
-
-    console.log('rowsrowsrows', rows);
     return rows;
   }
 
@@ -384,8 +382,6 @@ export class ClientsFotoService {
        WHERE is_primary = ? AND clientsId = ? AND userId = ?`,
       [isPrimary, clientId, userId],
     );
-
-    console.log('rowsrowsrows', rows);
     return rows;
   }
 }

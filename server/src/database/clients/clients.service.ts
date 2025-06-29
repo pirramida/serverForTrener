@@ -19,19 +19,79 @@ export class ClientsService {
     });
   }
 
-  async customGet(clientId: number, nameColumn?: string): Promise<any> {
+async saveClientBlock(payload: any): Promise<any> {
+  try {
+    const rows = (await this.databaseService.query(
+      'SELECT clientInfo FROM clients WHERE id = ?',
+      [payload.clientId],
+    )) as any;
 
+    const raw = Array.isArray(rows) ? rows[0]?.clientInfo : rows?.clientInfo;
+
+    let clientInfo: any[] = [];
+
+    if (raw && raw !== 'null') {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          clientInfo = parsed;
+        } else {
+          console.warn('Parsed clientInfo is not an array:', parsed);
+        }
+      } catch (e) {
+        console.warn('Ошибка парсинга clientInfo:', e);
+      }
+    } else {
+      console.log('clientInfo is empty or null, starting with empty array');
+    }
+
+    const blockName = payload.blockName;
+    const newBlockData = payload.data;
+
+    if (!blockName || !newBlockData) {
+      throw new Error('Отсутствует blockName или data в payload');
+    }
+
+    const updatedClientInfo = clientInfo.filter(
+      (block) => block.blockName !== blockName
+    );
+
+    updatedClientInfo.push({
+      blockName,
+      data: newBlockData,
+    });
+
+    const newClientInfoStr = JSON.stringify(updatedClientInfo);
+
+    await this.databaseService.query(
+      'UPDATE clients SET clientInfo = ? WHERE id = ?',
+      [newClientInfoStr, payload.clientId],
+    );
+
+    return { success: true };
+  } catch (err) {
+    console.error('Ошибка при сохранении блока клиента:', err);
+    throw new Error('Ошибка при сохранении блока клиента: ' + err.message);
+  }
+}
+
+
+
+
+
+
+  async customGet(clientId: number, nameColumn?: string): Promise<any> {
     const rows = await this.databaseService.query(
       `SELECT ${nameColumn} FROM clients WHERE id = ?`,
       [clientId],
     );
-  
+
     if (!rows.length) {
       throw new NotFoundException('Клиент не найден');
     }
-  
+
     const value = rows[0][nameColumn];
-  
+
     // Если поле — parametrs (или любое поле с JSON), можно попробовать распарсить:
     if (typeof value === 'string') {
       if (value.startsWith('{') || value.startsWith('[')) {
@@ -41,14 +101,12 @@ export class ClientsService {
           return value; // Если парсинг не удался, вернуть как есть
         }
       }
-    
+
       return value; // Просто строка
     }
-    
+
     return null; // или вернуть {}, [] — в зависимости от твоих ожиданий по умолчанию
-    
   }
-  
 
   async deleteClient(phoneNumber: any): Promise<void> {
     try {
@@ -62,6 +120,70 @@ export class ClientsService {
       );
       throw new HttpException(
         'Не удалось удалить клиента',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  async clientStatistic(clientId: number): Promise<any> {
+    try {
+      const clientQuery = `SELECT * FROM clients WHERE id = ?`;
+      const paymentsQuery = `SELECT * FROM payment_history WHERE clientId = ?`;
+      const sessionsQuery = `SELECT * FROM session_history WHERE clientId = ?`;
+
+      const [client] = (await this.databaseService.query(clientQuery, [
+        clientId,
+      ])) as any;
+      const payments = (await this.databaseService.query(paymentsQuery, [
+        clientId,
+      ])) as any;
+      const sessions = (await this.databaseService.query(sessionsQuery, [
+        clientId,
+      ])) as any;
+
+      // 1. Параметры тела
+      const parsedParams = client.parametrs
+        ? JSON.parse(client.parametrs)
+        : { primary: [], corrections: [] };
+
+      // 2. Готовим платежи для графиков
+      const formattedPayments = payments.map((p) => ({
+        date: p.date,
+        type: p.type,
+        quantity: p.quantity,
+        quantityLeft: p.quantityLeft,
+        status: p.status,
+        amount: p.amount,
+        releaseDate: p.releaseDate,
+      }));
+
+      // 3. Готовим сессии (в том числе разбираем report из строки)
+      const formattedSessions = sessions.map((s) => {
+        const report = s.report ? JSON.parse(s.report) : {};
+        return {
+          date: s.date,
+          trainingTime: s.trainingTime,
+          type: report.type || '',
+          intensity: report.intensity || '',
+          rating: report.rating || 0,
+          conditionBefore: report.conditionBefore || '',
+          conditionAfter: report.conditionAfter || '',
+          comment: report.comment || '',
+        };
+      });
+
+      return {
+        parameters: parsedParams, // параметры тела
+        payments: formattedPayments, // платежи
+        sessions: formattedSessions, // тренировки
+      };
+    } catch (error) {
+      console.log(
+        'Не получилось выполнить запрос для создания статистики ',
+        error,
+      );
+      throw new HttpException(
+        'Не получилось выполнить запрос для создания статистики',
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
@@ -243,5 +365,57 @@ export class ClientsService {
         }
       });
     });
+  }
+
+  // services/user.service.ts
+  async getStepAndCalories(userId: number, clientId: number) {
+    try {
+      const res = (await this.databaseService.query(
+        'SELECT stepsAndCalories FROM clients WHERE id = ?',
+        [clientId],
+      )) as any;
+
+      if (!res || !res[0]?.stepsAndCalories) return [];
+
+      return JSON.parse(res[0].stepsAndCalories);
+    } catch (error) {
+      throw new Error('Ошибка при загрузке данных о шагах и калориях');
+    }
+  }
+
+  async saveStepAndCalories(data: {
+    userId: number;
+    clientId: number;
+    date: string;
+    steps?: number;
+    calories?: number;
+  }) {
+    try {
+      const { userId, clientId, date, steps, calories } = data;
+
+      const res = (await this.databaseService.query(
+        'SELECT stepsAndCalories FROM clients WHERE id = ?',
+        [clientId],
+      )) as any;
+
+      const current = res?.[0]?.stepsAndCalories
+        ? JSON.parse(res[0].stepsAndCalories)
+        : [];
+
+      // Обновляем или добавляем запись
+      const updated = [
+        ...current.filter((e) => e.date !== date),
+        { date, steps, calories },
+      ];
+
+      await this.databaseService.query(
+        'UPDATE clients SET stepsAndCalories = ? WHERE id = ?',
+        [JSON.stringify(updated), clientId],
+      );
+
+      return { success: true, updated };
+    } catch (error) {
+      throw new Error('Ошибка при сохранении шагов и калорий');
+    }
   }
 }
