@@ -11,8 +11,10 @@ import { AuthModule } from './auth/Auth.module';
 import { JwtService } from '@nestjs/jwt';
 import { additionalPaymentsModule } from './database/additional_payments/additional_payments.module';
 import { FitnessTestModule } from './database/fitness_test/fitness_test.module';
+import { ReportModule } from './database/report/report.module';
+
 @Module({
-  imports: [FitnessTestModule, DatabaseModule, ClientsModule, PaymentModule, UsersModule, SessionModule, ClientsFotoModule, AuthModule, additionalPaymentsModule ],
+  imports: [FitnessTestModule, DatabaseModule, ClientsModule, PaymentModule, UsersModule, SessionModule, ClientsFotoModule, AuthModule, additionalPaymentsModule, ReportModule ],
   controllers: [AppController],
   providers: [AppService, JwtService],
 })
