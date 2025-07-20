@@ -14,9 +14,10 @@ export class ReportController {
     constructor(private readonly reportService: ReportService) { }
 
     @Post('monthly')
-    async generateMonthlyReport(@Body('clientId') clientId: string, @Res() res: Response) {
+    async generateMonthlyReport(@Body() body: { clientId: string; startDate?: string; endDate?: string}, @Res() res: Response) {
         try {
-            const buffer = await this.reportService.generateMonthlyReport(clientId);
+            const { startDate, endDate, clientId } = body;
+            const buffer = await this.reportService.generateMonthlyReport(clientId, startDate, endDate);
 
             res
                 .set({
